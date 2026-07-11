@@ -1,6 +1,6 @@
 # casper-auth — Plan
 
-**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform | **Used by:** every module (via `can()`), casper-ai (assistant principals) | **Aligned with:** master-plan v0.2 (D-003, D-004, D-007, D-016, D-017)
+**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform | **Used by:** every module (via `can()`), casper-ai (assistant principals) | **Aligned with:** master-plan v0.3 (D-003, D-004, D-007, D-016, D-017)
 
 ## Purpose
 

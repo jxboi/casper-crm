@@ -1,6 +1,6 @@
 # casper-workflow — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.2 (D-006, D-007, D-014, D-017)
+**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.3 (D-006, D-007, D-014, D-017)
 
 ## Purpose
 

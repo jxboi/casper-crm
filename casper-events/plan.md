@@ -1,6 +1,6 @@
 # casper-events — Plan
 
-**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.2 (D-005, D-012, D-016, D-017)
+**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.3 (D-005, D-012, D-016, D-017, D-019)
 
 ## Purpose
 
@@ -9,7 +9,7 @@ The nervous system. One append-only stream of typed events describing everything
 ## Scope
 
 **In**
-- **Domain events:** transactional outbox (`domain_events` table written inside the same `withTx` as the mutation, per D-005); dispatcher job fans out to registered consumers (at-least-once; consumer handlers idempotent; per-consumer cursor + retry with dead-letter).
+- **Domain events:** transactional outbox (`domain_events` table written inside the same `withTx` as the mutation, per D-005); dispatch fans out to registered consumers via a post-commit `waitUntil` trigger plus a **sweeper cron** that drains anything a crash left behind (D-019) — at-least-once; consumer handlers idempotent; fan-out executes as workflow steps with per-consumer cursor + retry and dead-letter parking.
 - **Consumer registry:** `on('deal.stage_changed', handler)` registration used by workflow automations, feedback detectors, notification rules, timeline projector.
 - **Interaction events:** lighter-weight telemetry stream (`interaction_events`) for the feedback loop — `export.clicked`, `view.opened`, `record.copied`, `nav.pattern`, `manual_task.created_after(event)` context. Separate table, sampled where high-volume, shorter retention, org-configurable (privacy, D-016).
 - **Audit log:** immutable projection of domain events with actor/subject indexing, retention policy per org, export (CSV/JSON). Includes AI runs' tool calls (summarized refs, full detail stored by casper-ai) and permission denials.

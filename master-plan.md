@@ -1,6 +1,6 @@
 # Casper CRM — Master Plan
 
-**Version:** 0.2 &nbsp;|&nbsp; **Date:** 2026-07-11 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
+**Version:** 0.3 &nbsp;|&nbsp; **Date:** 2026-07-11 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
 
 > Source references: [adaptive-crm-workflow-platform-summary.md](adaptive-crm-workflow-platform-summary.md), [ai-strategy.md](ai-strategy.md).
 > Those documents are the vision input. **This file is the source of truth for cross-module decisions.** Each module folder contains a `plan.md` that must stay aligned with this file (see §10 Alignment Protocol).
@@ -34,7 +34,7 @@ The three architectural bets that differentiate this product (everything else is
 
 ## 3. Architecture overview
 
-Modular monolith. One TypeScript monorepo, modules as workspace packages, two runtimes (web + server) sharing one Postgres database. No microservices until a specific module proves it needs extraction.
+Modular monolith. One TypeScript monorepo, modules as workspace packages, deployed as a **single Vercel project** (D-019) sharing one Neon Postgres database — user-facing routes and durable background workflows are two surfaces of the same deployment, not separate services. No microservices until a specific module proves it needs extraction.
 
 ```mermaid
 graph TD
@@ -115,6 +115,7 @@ Append-only. Module plans cite these by ID. Superseding a decision requires a ne
 - **D-016 — Security & compliance baseline.** Tenant-isolation tests in CI (cross-tenant access attempts must fail); OAuth tokens and secrets sealed with platform crypto; PDPA-aware: org-level data export & deletion, configurable retention for events/audit; prompt-injection stance: **all CRM content (records, emails, feedback text) is untrusted data, never instructions** — tool results are structured and delimited, and assistant instructions come only from versioned prompt packs and platform context.
 - **D-017 — Adoption path: dogfood → design partners → self-serve.** Phase 1 is built for the founder running his own real pipeline daily (dogfood). Design-partner readiness — multi-user polish, CSV import, PDPA enforcement checkpoint — is Phase 2 entry work. Self-serve comes later. Phase exit criteria are phrased accordingly.
 - **D-018 — Web↔module layer is tRPC.** tRPC routers live in casper-web's server layer; procedures are thin wrappers over module public APIs (no business logic in routers). casper-api's roles (SSE streaming, jobs, public REST in P4) are unchanged. Resolves Q-4.
+- **D-019 — Vercel-first infrastructure (supersedes D-015; amends D-011).** Founder familiarity wins: everything runs on Vercel. **One Vercel project** — the Next.js app — hosts the UI, tRPC, run-stream/SSE route handlers, **Vercel Cron** endpoints, and **Workflow DevKit (WDK)** durable workflows; a second Vercel project is the escape hatch if build times or blast radius ever demand a split. Long/multi-step work (AI runs, event fan-out, imports, mailbox sync, measurement/retention) runs as WDK workflows: durable per-step retries, `createHook`/`resumeHook` suspensions for human-approval pauses (zero compute while waiting), resumable namespaced output streams. Ordinary long requests ride Fluid Compute (300s default / 800s max on Pro; Active-CPU pricing bills almost nothing while awaiting model responses). **pg-boss is dropped** (it needs a persistent poller); the transactional outbox (D-005) stays, drained by post-commit `waitUntil` triggers plus a sweeper cron for at-least-once delivery. D-011's no-Redis stance stands. Rest of stack: Neon via Vercel Marketplace (+ `@neondatabase/serverless` pooling), **Vercel Blob**, Flags SDK + Edge Config (global flags; org-scoped targeting stays in Postgres), Vercel Observability + log drains, Vercel WAF for coarse edge rate limits, Vercel git integration for CI + preview deployments. Resolves Q-2.
 
 ## 6. Shared contracts
 
@@ -260,7 +261,8 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 | Google restricted-scope (Gmail) verification takes months | Start CASA process at Phase 2 start; product fully usable draft-only; Microsoft Graph path in parallel |
 | Approval fatigue → users disable safety | Risk-proportional policies, batching, within-limits standing approvals with hard caps (Phase 2 focus) |
 | AI cost blowout | Per-assistant/org budgets, haiku for high-volume classification, cost per run tracked from day one |
-| Solo-founder bandwidth | Modular monolith (one deploy), Postgres-only infra, boring technology everywhere except the three bets (§2) |
+| Solo-founder bandwidth | Modular monolith on a single Vercel project (D-019 — founder's home turf), Postgres-only data infra, boring technology everywhere except the three bets (§2) |
+| Workflow DevKit is new | P0 spike validates local dev + testing story before the AI run engine commits to it; fallback documented in casper-api plan (Fluid functions + outbox-table job runner) |
 | Tenant data leakage | RLS + `can()` on every path + CI cross-tenant tests (Phase 0 exit criterion) |
 | Dogfooding blindness (building for self ≠ market) | D-017 design-partner gate at Phase 2; discovery interviews continue through Phase 1; founder captures his own friction via the feedback widget like a real user |
 
@@ -269,7 +271,7 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 | # | Question | Owner | Status / decide by |
 |---|---|---|---|
 | Q-1 | Auth provider | casper-auth | **Resolved v0.2:** better-auth; GitHub OAuth is the primary login for dogfood (+ email/password); Google OAuth + magic link before design partners (P2) |
-| Q-2 | Final hosting for casper-api: Railway vs Fly.io | casper-platform | Phase 0 exit |
+| Q-2 | Hosting for the server surface | casper-platform | **Resolved v0.3:** all-Vercel (D-019) — no Railway/Fly; WDK + Cron + Fluid Compute replace the standalone worker service |
 | Q-3 | Can a user approve a high-risk change set they authored? (default: no, for orgs > 1 seat) | casper-changesets | Phase 1 |
 | Q-4 | Web↔module call layer | casper-web | **Resolved v0.2:** tRPC (D-018) |
 | Q-5 | Product name ("Casper" is a codename) | founder | Pre-launch |
@@ -278,5 +280,6 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 
 ## 13. Changelog
 
+- **v0.3 (2026-07-11)** — Vercel-first infrastructure per founder preference (D-019, supersedes D-015 / amends D-011): single Vercel project; Workflow DevKit for AI runs (per-turn durable steps, `createHook` approval pauses, resumable streams) and all background work; Vercel Cron; outbox drained via `waitUntil` + sweeper cron (pg-boss dropped); Neon via Marketplace, Vercel Blob, Flags SDK/Edge Config, Vercel Observability + WAF. Q-2 resolved (no Railway/Fly). WDK-maturity risk added with P0 spike + fallback. casper-api redefined as the in-project server surface, not a standalone service.
 - **v0.2 (2026-07-11)** — Refinement session with founder. Added D-017 (dogfood-first adoption path) and D-018 (tRPC web↔module layer). Phase 1 split into 1a (dogfood CRM) / 1b (M1 demo slice) / 1c (hardening); CSV import moved to Phase 2; PDPA enforcement + multi-user polish set as Phase 2 entry work. Dogfood metrics and dogfooding-blindness risk added. Q-1 and Q-4 resolved, Q-6 deferred, Q-7 reframed (Gmail test-mode for dogfood). D-003 full org→workspace→team hierarchy from P0 explicitly confirmed by founder.
 - **v0.1 (2026-07-11)** — Initial master plan. 12 modules defined; decisions D-001…D-016; phases 0–4; MVP scope; alignment protocol.

@@ -1,6 +1,6 @@
 # casper-records — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth, casper-events | **Used by:** casper-workflow, casper-changesets, casper-ai, casper-sales, casper-comms, casper-web | **Aligned with:** master-plan v0.2 (D-002, D-012, D-013, D-017)
+**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth, casper-events | **Used by:** casper-workflow, casper-changesets, casper-ai, casper-sales, casper-comms, casper-web | **Aligned with:** master-plan v0.3 (D-002, D-012, D-013, D-017)
 
 ## Purpose
 

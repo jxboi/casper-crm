@@ -1,6 +1,6 @@
 # casper-sales — Plan
 
-**Status:** Draft v0.1 | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.2 (D-013, D-014, D-017, §2 product-first strategy)
+**Status:** Draft v0.1 | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.3 (D-013, D-014, D-017, §2 product-first strategy)
 
 ## Purpose
 

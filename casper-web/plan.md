@@ -1,6 +1,6 @@
 # casper-web — Plan
 
-**Status:** Draft v0.1 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.2 (D-001, D-010, D-011, D-015, D-017, D-018)
+**Status:** Draft v0.1 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.3 (D-001, D-010, D-017, D-018, D-019)
 
 ## Purpose
 
@@ -25,7 +25,7 @@ The product's face: a fast, responsive Next.js application composing every modul
 
 ## Key design points
 
-- **Data access pattern (D-001/D-011/D-018):** **tRPC** (Q-4 resolved in master-plan v0.2). Routers live in casper-web's server layer; procedures are thin, logic-free wrappers over module public APIs (same monorepo; web runtime talks to the same Postgres); React Server Components may still call module read APIs directly where a procedure adds nothing. Anything long-running (AI runs, imports, syncs) is enqueued and executed by casper-api's worker; run/step streaming consumed from casper-api SSE endpoints (tRPC does not carry streams).
+- **Data access pattern (D-001/D-011/D-018):** **tRPC** (Q-4 resolved in master-plan v0.2). Routers live in casper-web's server layer; procedures are thin, logic-free wrappers over module public APIs (same monorepo; web runtime talks to the same Postgres); React Server Components may still call module read APIs directly where a procedure adds nothing. Anything long-running (AI runs, imports, syncs) starts a Workflow DevKit run (D-019); live run/step streaming is consumed from casper-api's run-stream route handlers backed by resumable workflow streams (tRPC does not carry streams). Same Vercel project, so all of this is one deploy with per-PR previews.
 - **Optimistic UI with guard honesty:** board drags and quick edits apply optimistically but surface guard/validation failures loudly (workflow guards are product behavior, not errors to hide).
 - **Diff rendering is a core component:** the change-diff viewer (field before/after, risk badges, stale markers) is shared by AI Changes surface, approvals inbox, workflow publish preview, and rollback preview — build once, polish continuously (it *is* the trust UI).
 - **Terminology layer:** UI copy resolves through casper-sales' terminology map so the engine stays generic while the product feels purpose-built (reference doc §5).

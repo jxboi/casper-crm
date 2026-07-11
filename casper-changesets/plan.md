@@ -1,6 +1,6 @@
 # casper-changesets — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.2 (D-006, D-007, D-017)
+**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.3 (D-006, D-007, D-017)
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # casper-feedback — Plan
 
-**Status:** Draft v0.1 | **Layer:** AI | **Phases:** 1 (capture) → 3 (full loop) | **Depends on:** casper-events, casper-changesets, casper-workflow, casper-ai (haiku classification), casper-platform | **Used by:** casper-web (widget + change studio), casper-workflow (proposals become config publishes) | **Aligned with:** master-plan v0.2 (D-005, D-006, D-009, D-017)
+**Status:** Draft v0.1 | **Layer:** AI | **Phases:** 1 (capture) → 3 (full loop) | **Depends on:** casper-events, casper-changesets, casper-workflow, casper-ai (haiku classification), casper-platform | **Used by:** casper-web (widget + change studio), casper-workflow (proposals become config publishes) | **Aligned with:** master-plan v0.3 (D-005, D-006, D-009, D-017)
 
 ## Purpose
 
