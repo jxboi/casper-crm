@@ -1,8 +1,10 @@
 # OS
 .DS_Store
+Thumbs.db
 
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Env & secrets
 .env
@@ -11,9 +13,32 @@ node_modules/
 
 # Build output
 dist/
+build/
 .next/
+out/
 .turbo/
 *.tsbuildinfo
 
+# Test & coverage output
+coverage/
+.vitest/
+*.lcov
+
+# Local database (PGlite on-disk data dir, if PGLITE_DATA is set)
+.pglite/
+pgdata/
+
+# Vercel
+.vercel/
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
 # Logs
 *.log
+npm-debug.log*
+pnpm-debug.log*

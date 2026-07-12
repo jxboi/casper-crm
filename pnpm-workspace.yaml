@@ -1,0 +1,5 @@
+packages:
+  - casper-platform
+  - casper-auth
+  - casper-events
+  - casper-records
