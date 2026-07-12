@@ -1,6 +1,6 @@
 # casper-web — Plan
 
-**Status:** Draft v0.1 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.3 (D-001, D-010, D-017, D-018, D-019)
+**Status:** Draft v0.2 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.5 (D-001, D-010, D-017, D-018, D-019)
 
 ## Purpose
 
@@ -9,7 +9,7 @@ The product's face: a fast, responsive Next.js application composing every modul
 ## Scope
 
 **In**
-- **Foundation (P0):** Next.js App Router + Tailwind + shadcn/ui; auth pages (sign-up/in, invite acceptance, org/workspace creation); app shell — org/workspace switcher, nav, user menu, notification bell; error/empty/loading states as first-class components.
+- **Foundation (P0):** Next.js App Router + Tailwind + shadcn/ui; auth pages (GitHub sign-in, org/workspace creation — invite acceptance and credential login are P2 per master-plan v0.5); app shell — org/workspace switcher, nav, user menu, notification bell; error/empty/loading states as first-class components.
 - **Records experience (P0–P1):** type-driven **table views** (TanStack Table; server-driven Filter AST querying; column config; saved views UI); **record detail** — field panel (inline edit → direct write path), timeline (casper-events projection), tasks, related records, attachments; **pipeline board** (drag between stages → `workflow.transition`, optimistic with guard-failure rollback); **tasks inbox** (my tasks, due today, overdue); global search (cmd-k palette P2); CSV import wizard (P2 — dogfood uses seed data, D-017).
 - **AI surfaces (P1, D-010):** persistent **AI dock** (right-side panel, per-workspace) hosting the four surfaces per run — **Conversation** (chat, streaming via SSE), **Plan** (scope/steps/tools card with approve/narrow/edit/cancel), **Workspace** (artifacts: email drafts, summaries), **Changes** (record-level diff list: field before/after, per-change approve/reject, approve-all, commit state). Run history per user. Entry points: dock, record-page contextual actions ("prepare follow-up"), neglected-deals view bulk action.
 - **Approvals inbox (P1):** all change sets awaiting my approval across origins (AI runs, workflow publishes); batch approval UX (P2); **mobile-first layout** — approving from a phone is a core flow, not an afterthought.

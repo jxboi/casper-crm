@@ -1,6 +1,6 @@
 # Casper CRM — Master Plan
 
-**Version:** 0.4 &nbsp;|&nbsp; **Date:** 2026-07-12 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
+**Version:** 0.5 &nbsp;|&nbsp; **Date:** 2026-07-12 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
 
 > Source references: [adaptive-crm-workflow-platform-summary.md](adaptive-crm-workflow-platform-summary.md), [ai-strategy.md](ai-strategy.md).
 > Those documents are the vision input. **This file is the source of truth for cross-module decisions.** Each module folder contains a `plan.md` that must stay aligned with this file (see §10 Alignment Protocol).
@@ -198,7 +198,7 @@ Phases match the AI-strategy rollout. A phase is done when its **exit criteria**
 
 ### Phase 0 — Foundations (walking skeleton)
 Modules: platform, auth, events, records (core), web (shell), api (runtime skeleton).
-Build: monorepo scaffold; multi-tenant auth (sign-up, org/workspace, invites, roles); record engine with system Task type + one placeholder product type; event outbox + audit log + timeline; deployed to real infra with CI.
+Build: monorepo scaffold; multi-tenant auth (GitHub sign-in, org/workspace CRUD, seed roles — Org Owner + Member; schema-level org→workspace→team tenancy on every table; teams machinery, invites, credential login all P2 per v0.5); record engine with system Task type + one placeholder product type; event outbox + audit log + timeline; deployed to real infra with CI.
 **Exit criteria:** two orgs can sign up and cannot see each other's data (verified by automated cross-tenant tests); creating/updating a record produces an audit entry and timeline item; deployed web + api + db with CI; `can()` gate used by every write path.
 
 ### Phase 1 — Sales CRM + narrow assistant MVP (dogfood, D-017)
@@ -218,7 +218,7 @@ Build: full ~10-tool set (adds transitions, workflow reads, clarification tool);
 
 ### Phase 2 — Safety & policy depth
 Modules: ai, changesets, auth, comms, web, sales (dashboards).
-Build: **design-partner readiness (D-017 gate): CSV import + dedupe, multi-user onboarding polish, PDPA/retention enforcement checkpoint;** standing approval policies (allow-within-limits, batch review) with hard budget caps; selective/batch approvals UX; conflict detection + stale-change re-review; one-click rollback (compensating change sets); assistant budgets (tokens/$/records/day); Gmail send via **test-mode OAuth for dogfooding** + Microsoft OAuth **send-on-approval** (start Google restricted-scope verification once design partners commit); persistent AI workspaces; AI eval harness (golden tasks, plan-approval-rate); dashboards; PWA + mobile approval polish.
+Build: **design-partner readiness (D-017 gate): CSV import + dedupe, multi-user onboarding (invitation flow, teams + team-scoped grants, full role catalog, magic-link and/or email+password login), PDPA/retention enforcement checkpoint;** standing approval policies (allow-within-limits, batch review) with hard budget caps; selective/batch approvals UX; conflict detection + stale-change re-review; one-click rollback (compensating change sets); assistant budgets (tokens/$/records/day); Gmail send via **test-mode OAuth for dogfooding** + Microsoft OAuth **send-on-approval** (start Google restricted-scope verification once design partners commit); persistent AI workspaces; AI eval harness (golden tasks, plan-approval-rate); dashboards; PWA + mobile approval polish.
 **Exit criteria:** a user can safely leave "always allow within limits" on for low-risk actions for a week without surprises; rollback works on real committed change sets; conflicting concurrent edits are detected, never clobbered; measured plan-approval and change-acceptance rates ≥ agreed thresholds.
 
 ### Phase 3 — Workflow evolution loop
@@ -273,7 +273,7 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 
 | # | Question | Owner | Status / decide by |
 |---|---|---|---|
-| Q-1 | Auth provider | casper-auth | **Resolved v0.2:** better-auth; GitHub OAuth is the primary login for dogfood (+ email/password); Google OAuth + magic link before design partners (P2) |
+| Q-1 | Auth provider | casper-auth | **Resolved v0.2, amended v0.5:** better-auth; GitHub OAuth is the *only* login for dogfood; Google OAuth + magic link before design partners (P2); email+password deferred to P2 and may be replaced by magic link entirely |
 | Q-2 | Hosting for the server surface | casper-platform | **Resolved v0.3:** all-Vercel (D-019) — no Railway/Fly; WDK + Cron + Fluid Compute replace the standalone worker service |
 | Q-3 | Can a user approve a high-risk change set they authored? (default: no, for orgs > 1 seat) | casper-changesets | Phase 1 |
 | Q-4 | Web↔module call layer | casper-web | **Resolved v0.2:** tRPC (D-018) |
@@ -283,6 +283,7 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 
 ## 13. Changelog
 
+- **v0.5 (2026-07-12)** — Auth P0 slimmed for the dogfood phase per founder decision ("is auth too complex?" review). P0 keeps the load-bearing pieces — unified principal model, `can()` + action registry, org/workspace tenancy columns on every table, RLS, cross-tenant tests — and defers the machinery with no consumer before design partners: teams + team-scoped grants, invitation flow/UI, email+password (P2 decides magic-link-only vs passwords; rate limiting/reset ship with that), and the full role catalog (P0 seeds Org Owner + Member only). This *refines* the v0.2 "full org→workspace→team hierarchy from P0" note: the hierarchy stays in the schema from P0 (no retrofit risk — teams add no columns to domain tables since team scope resolves via record ownership); team permission machinery and member-management UI move to P2. Q-1 amended. casper-auth plan bumped to v0.3 and casper-web P0 auth pages adjusted in the same session.
 - **v0.4 (2026-07-12)** — Auth plan review alignment. §6: field-action grammar is now type-qualified (`record.field.read|write:<recordType>.<fieldKey>` — field keys are unique only within a record type) and the `Decision` return type of `can()` is defined. Phase 1 module list now includes auth (assistant principals + field masks are prerequisites for Phase 1b). casper-auth plan bumped to v0.2 in the same session: org-level memberships added to the data model (closes the D-003 gap), better-auth ↔ tenancy mapping specified, team-scope semantics defined (via record ownership), sign-in/session audit events, login rate limiting, account-linking stance, and enforce-vs-probe deny-event emission.
 - **v0.3 (2026-07-11)** — Vercel-first infrastructure per founder preference (D-019, supersedes D-015 / amends D-011): single Vercel project; Workflow DevKit for AI runs (per-turn durable steps, `createHook` approval pauses, resumable streams) and all background work; Vercel Cron; outbox drained via `waitUntil` + sweeper cron (pg-boss dropped); Neon via Marketplace, Vercel Blob, Flags SDK/Edge Config, Vercel Observability + WAF. Q-2 resolved (no Railway/Fly). WDK-maturity risk added with P0 spike + fallback. casper-api redefined as the in-project server surface, not a standalone service.
 - **v0.2 (2026-07-11)** — Refinement session with founder. Added D-017 (dogfood-first adoption path) and D-018 (tRPC web↔module layer). Phase 1 split into 1a (dogfood CRM) / 1b (M1 demo slice) / 1c (hardening); CSV import moved to Phase 2; PDPA enforcement + multi-user polish set as Phase 2 entry work. Dogfood metrics and dogfooding-blindness risk added. Q-1 and Q-4 resolved, Q-6 deferred, Q-7 reframed (Gmail test-mode for dogfood). D-003 full org→workspace→team hierarchy from P0 explicitly confirmed by founder.
