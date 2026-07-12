@@ -1,6 +1,6 @@
 # casper-feedback — Plan
 
-**Status:** Draft v0.1 | **Layer:** AI | **Phases:** 1 (capture) → 3 (full loop) | **Depends on:** casper-events, casper-changesets, casper-workflow, casper-ai (haiku classification), casper-platform | **Used by:** casper-web (widget + change studio), casper-workflow (proposals become config publishes) | **Aligned with:** master-plan v0.3 (D-005, D-006, D-009, D-017)
+**Status:** Draft v0.2 | **Layer:** AI | **Phases:** 1 (capture) → 3 (full loop) | **Depends on:** casper-events, casper-changesets, casper-workflow, casper-ai (haiku classification), casper-platform | **Used by:** casper-web (widget + change studio), casper-workflow (proposals become config publishes) | **Aligned with:** master-plan v0.5 (D-005, D-006, D-009, D-017, D-025)
 
 ## Purpose
 
@@ -47,6 +47,10 @@ Emits `feedback.submitted/triaged`, `signal.detected`, `proposal.created/accepte
 - **P2:** feedback linked from record/timeline; dedupe assist (haiku similarity on submit).
 - **P3:** detector framework + initial 4–6 detectors; clustering; proposals; simulation/shadow integration; pilot scoping; outcome measurement; change studio.
 - **P4:** voice notes; email/chat-sourced feedback (via casper-comms ingestion).
+
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not committed** — capture is exercised through casper-web's widget, and the P3 detectors/clustering are better proven by fixtures and tests. If built (most likely alongside the P3 loop), `pnpm play feedback` would exercise: a synthetic signal feeder (replay export/manual-task/stage-skip patterns → watch detectors fire with evidence + stats); a ChangeProposal inspector showing the machine-readable config payload and a dry run of its success-metric query pre/post.
 
 ## Open questions
 

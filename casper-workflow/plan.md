@@ -1,6 +1,6 @@
 # casper-workflow — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.3 (D-006, D-007, D-014, D-017)
+**Status:** Draft v0.2 | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.5 (D-006, D-007, D-014, D-017, D-025)
 
 ## Purpose
 
@@ -42,6 +42,16 @@ Emits `<type>.stage_changed`, `workflow.published/rolled_back`, `workflow.sla_br
 - **P2:** draft_email action; richer guards (role-based); automation templates; run-log UI.
 - **P3:** simulation, shadow mode, gradual rollout, divergence reporting; stage-mapping migrations for in-flight records.
 - **P4:** webhook action; cross-type automations if demanded.
+
+## Playground (D-025 — committed surface)
+
+Dev-only surface in `casper-workflow/playground/`, mounted via `pnpm play workflow` (ships P1a with the core engine). Exercises:
+
+- **Stage-model visualizer:** stages/transitions/guards of any definition version, rendered from the JSON config.
+- **`evaluate()` scratchpad:** pick definition version + record + event + `now` → the returned `Effect[]`, nothing executed — the purity contract (D-014) makes this the module's cheapest and most valuable test surface.
+- **Transition tester:** attempt transitions as any principal → guard results, `can('record.transition')` outcome, emitted event preview.
+- **Automation dry-run:** feed a synthetic event through an automation definition → condition evaluation + effects + run-log entry; includes a self-triggering rule to demo loop protection.
+- **Publish preview:** version diff for a draft definition as the change set would show it; rollback repoint demo. (P3: simulation/shadow divergence report viewer.)
 
 ## Open questions
 

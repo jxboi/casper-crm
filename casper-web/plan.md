@@ -1,6 +1,6 @@
 # casper-web — Plan
 
-**Status:** Draft v0.1 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.3 (D-001, D-010, D-017, D-018, D-019)
+**Status:** Draft v0.3 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.5 (D-001, D-010, D-017, D-018, D-019, D-020, D-024, D-025)
 
 ## Purpose
 
@@ -13,7 +13,7 @@ The product's face: a fast, responsive Next.js application composing every modul
 - **Records experience (P0–P1):** type-driven **table views** (TanStack Table; server-driven Filter AST querying; column config; saved views UI); **record detail** — field panel (inline edit → direct write path), timeline (casper-events projection), tasks, related records, attachments; **pipeline board** (drag between stages → `workflow.transition`, optimistic with guard-failure rollback); **tasks inbox** (my tasks, due today, overdue); global search (cmd-k palette P2); CSV import wizard (P2 — dogfood uses seed data, D-017).
 - **AI surfaces (P1, D-010):** persistent **AI dock** (right-side panel, per-workspace) hosting the four surfaces per run — **Conversation** (chat, streaming via SSE), **Plan** (scope/steps/tools card with approve/narrow/edit/cancel), **Workspace** (artifacts: email drafts, summaries), **Changes** (record-level diff list: field before/after, per-change approve/reject, approve-all, commit state). Run history per user. Entry points: dock, record-page contextual actions ("prepare follow-up"), neglected-deals view bulk action.
 - **Approvals inbox (P1):** all change sets awaiting my approval across origins (AI runs, workflow publishes); batch approval UX (P2); **mobile-first layout** — approving from a phone is a core flow, not an afterthought.
-- **Admin (P1–P2):** members & roles (casper-auth), field editor, workflow editor (list-based stage/transition/guard editing P1; visual graph P3), automation editor + run log, assistant policy editor (P2), audit log browser, org settings.
+- **Admin (P1–P2):** members & roles (casper-auth; built-in roles per D-020, no Guest), teams management, member deactivation + bulk "reassign all records to X" flow (P2, D-024), field editor, workflow editor (list-based stage/transition/guard editing P1; visual graph P3), automation editor + run log, assistant policy editor (P2), audit log browser, org settings (incl. `managerModel`, D-021).
 - **Feedback widget (P1):** floating trigger + element-target picker; auto-context capture (route, record, state); screenshot grab; submission < 15s (casper-feedback's success criterion is enforced here).
 - **Notifications (P1):** inbox panel, unread badges, prefs page.
 - **Change studio (P3):** feedback → themes → proposals → simulation results → pilot → outcome, one connected view (casper-feedback's UI).
@@ -38,6 +38,10 @@ The product's face: a fast, responsive Next.js application composing every modul
 - **P1c:** feedback widget, notifications UI, admin v1, in-app notification email prefs.
 - **P2:** design-partner readiness — CSV import wizard, onboarding/empty-state polish for non-founder users (D-017); dashboards, batch approvals, policy editor, PWA polish, cmd-k, dark mode.
 - **P3:** change studio, visual workflow editor, simulation/shadow result views.
+
+## Playground (D-025 — component gallery, not a module playground)
+
+casper-web is the product frontend, so it has no "module playground" in the D-025 sense. What may be worth building — once the components stabilize — is a small **component gallery** (Storybook-shaped, a different tool from the playground host) for the shared UI that deserves isolated iteration: above all the **change-diff viewer** (field before/after, risk badges, stale markers — the trust UI), plus the AI dock surfaces and error/empty/loading states, against fixture data. Optional and independent of the playground host; full-page flows are developed in the app itself.
 
 ## Open questions
 

@@ -1,6 +1,6 @@
 # casper-sales — Plan
 
-**Status:** Draft v0.1 | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.3 (D-013, D-014, D-017, §2 product-first strategy)
+**Status:** Draft v0.3 | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.5 (D-013, D-014, D-017, D-021, D-025, §2 product-first strategy)
 
 ## Purpose
 
@@ -16,7 +16,7 @@ The first product: a Sales CRM with an AI operational assistant. This module is 
   - Relations: contact↔company, deal↔company, deal↔contacts. (Task/Note/Attachment come from the engine.)
 - **Pipeline workflow (config on casper-workflow):** `New → Qualified → Proposal → Negotiation → Won | Lost`; guards: amount + expected close required to enter Proposal; lost reason required on → Lost; permissions: only Manager+ may re-open Won/Lost.
 - **SLA/neglect rules (the assistant's trigger, defined as config):** deal is *neglected* when open AND (no activity ≥ 14 days OR next action date overdue OR stage dwell > stage threshold). Emits `record.neglected` — consumed by assistant digest, views, notifications.
-- **Default automations:** deal → Won ⇒ create onboarding kickoff Task (the reference doc's canonical example); deal → Lost ⇒ notify owner's manager (optional, org toggle); new Deal ⇒ assignment rule hook.
+- **Default automations:** deal → Won ⇒ create onboarding kickoff Task (the reference doc's canonical example); deal → Lost ⇒ notify owner's manager (optional, org toggle; "owner's manager" resolves per the org's `managerModel`, D-021 — under the P1 default `workspace` model it notifies the workspace's Manager-role holders); new Deal ⇒ assignment rule hook.
 - **Default views:** Pipeline (board by stage), My open deals, Neglected deals, Closing this month, All companies/contacts; sensible default columns.
 - **Sales Follow-up Assistant (definition on casper-ai):** persona + prompt pack (versioned in this module); scope: deals/contacts/companies/tasks + timelines, amount visible but high-risk to edit; tool subset (the MVP 10); policy matrix defaults — task/field proposals: `batch_review`; transitions: `require_every_time`; email drafts: always artifacts, send (P2) `require_every_time`; core behaviors: find neglected deals (via `record.neglected` + queries), summarize context from timeline, propose next actions (tasks + next-action-date updates + email draft), respect user working style feedback.
 - **Daily digest (P2):** morning summary per user — neglected deals, today's tasks, pending approvals — with one-click "have the assistant prepare follow-ups".
@@ -40,6 +40,10 @@ The first product: a Sales CRM with an AI operational assistant. This module is 
 - **P2:** daily digest; dashboards; CSV import + dedupe (design-partner gate, D-017); assistant eval fixtures baseline.
 - **P3:** feeds the evolution loop with real usage (this module's usage *is* the Phase-3 test bed).
 - **P4:** industry template variants (e.g. agency vs SaaS pipeline presets).
+
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not committed** — this module is config only, so a "playground" here mostly *composes* the records/workflow/ai surfaces over seeded data and adds little of its own. The genuinely useful piece is a **seed-data runner** (`pnpm play sales`) to apply the demo dataset or founder-pipeline template to the dev DB (idempotent re-runs, version upgrades) — which the committed engine surfaces then render. That seed runner is worth building with P1a even if the rest of a sales surface never is.
 
 ## Open questions
 

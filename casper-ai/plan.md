@@ -1,6 +1,6 @@
 # casper-ai — Plan
 
-**Status:** Draft v0.1 | **Layer:** AI | **Phases:** 1+ | **Depends on:** casper-auth, casper-records, casper-workflow, casper-changesets, casper-events, casper-platform | **Used by:** casper-sales (assistant definitions), casper-feedback, casper-web, casper-api (run executor) | **Aligned with:** master-plan v0.3 (D-004, D-007, D-008, D-009, D-016, D-017, D-019)
+**Status:** Draft v0.3 | **Layer:** AI | **Phases:** 1+ | **Depends on:** casper-auth, casper-records, casper-workflow, casper-changesets, casper-events, casper-platform | **Used by:** casper-sales (assistant definitions), casper-feedback, casper-web, casper-api (run executor) | **Aligned with:** master-plan v0.5 (D-004, D-007, D-008, D-009, D-016, D-017, D-019, D-022, D-023, D-024, D-025)
 
 ## Purpose
 
@@ -9,7 +9,7 @@ The AI orchestration layer: governed digital workers. Provides the assistant reg
 ## Scope
 
 **In**
-- **Assistant registry:** identity (name, purpose, avatar), linked **assistant principal** (casper-auth), data scope (workspaces, record types, sensitivity ceiling), tool allowlist, model tier, prompt-pack version, budgets (tokens & $/day per org, per-run token cap, max records touched per run, max runtime), **approval policy matrix** — per action class: `always_allow | allow_within_limits(caps) | batch_review | require_every_time | never` (D-007). Policies narrow platform permissions; they can never widen them.
+- **Assistant registry:** identity (name, purpose, avatar), linked **assistant principal** (casper-auth), data scope (workspaces, record types, sensitivity ceiling), tool allowlist, model tier, prompt-pack version, budgets (tokens & $/day per org, per-run token cap, max records touched per run, max runtime), **approval policy matrix** — per action class: `always_allow | allow_within_limits(caps) | batch_review | require_every_time | never` (D-007). Policies narrow platform permissions; they can never widen them. Personal assistants carry an `owner_user_id`: effective permissions = registry scope ∩ the owner's permissions, computed by `can()` (D-022); the assistant is auto-suspended when its owner is deactivated (D-024, via `member.deactivated`). Permission-changing actions are `never` for all assistants, not policy-configurable (D-023).
 - **Run engine:** `AIRun` state machine — `intake → clarifying → planning → awaiting_plan_approval? → executing → preview_ready → awaiting_approval → committing → done | failed | cancelled`. Runs execute as **Workflow DevKit workflows** (D-019): each model turn and each tool execution is a durable step (per-step retry; survives crashes and deploys); `awaiting_plan_approval`, `awaiting_approval`, and clarifications are `createHook` suspensions — zero compute while paused, resumed by the approval/answer route via `resumeHook`; live UI streaming uses namespaced workflow streams (`getWritable`: agent output vs step/status), resumable by `startIndex`. Every step, tool call (inputs/outputs), token count, and cost is *also* persisted as run events — the audit source of truth, independent of the stream. Cancellation via workflow cancel + run status; timeouts per step; bounded retries on idempotent tools.
 - **Work cycle semantics** (from ai-strategy): clarify only questions that materially change the result, state assumptions; plan object = scope, steps, tools to be used, estimated records touched; user can approve/narrow/edit/cancel plan (plan approval required per policy or when estimated impact exceeds caps); execution happens **inside a change set** — all mutation tools write proposals; preview = change-set diff; **commit is a platform action after human approval, never a model tool** (D-008).
 - **Tool framework:** `ToolDef` contract (master-plan §6). Every execution: tenant scope assertion → `can()` with assistant principal → risk/budget/rate check → structured result → run-event log. Zod schemas → JSON Schema for the API. Structured errors (from platform AppError taxonomy) so the model can recover sensibly.
@@ -44,6 +44,17 @@ The AI orchestration layer: governed digital workers. Provides the assistant reg
 - **P2:** policy matrix editor + standing approvals with caps; budgets with hard stops; eval harness + golden tasks; batch review flows; haiku classification endpoints for feedback.
 - **P3:** workflow-improvement assistant support (proposal-shaped outputs for casper-feedback); richer context retrieval (recent-similar-records, aggregates).
 - **P4:** second product assistant (onboarding/service); possible sonnet-5 cost tier after evals.
+
+## Playground (D-025 — committed surface)
+
+Dev-only surface in `casper-ai/playground/`, mounted via `pnpm play ai` (ships P1b with the run engine). Exercises:
+
+- **Run inspector:** launch a dev run and step through the persisted `ai_run_steps` — model turns, tool calls with inputs/outputs, tokens, cost — plus pause/resume/cancel against the WDK hooks.
+- **Tool sandbox:** invoke any registered tool as a chosen assistant principal via a typed input form → structured result or denial (`ai.tool_denied`), showing the scope → `can()` → risk/budget check order.
+- **Policy matrix tester:** action class × policy (`always_allow … never`) → resulting approval behavior for a hypothetical proposal.
+- **Prompt-pack viewer:** versioned packs and the exact composed system prompt + delimited data blocks for a scenario — the injection stance made visible.
+- **Budget panel:** daily counters per assistant; simulate `budget_exceeded` → run pause + notification.
+- **Injection fixture runner (eval-lite):** pass adversarial record fixtures through read tools and confirm no behavioral deviation.
 
 ## Open questions
 

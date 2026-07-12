@@ -1,6 +1,6 @@
 # casper-changesets — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.3 (D-006, D-007, D-017)
+**Status:** Draft v0.3 | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.5 (D-006, D-007, D-017, D-024, D-025)
 
 ## Purpose
 
@@ -15,7 +15,7 @@ The transactional workspace and change-set model — architectural bet #1 (maste
 - **Overlay reads:** `readThroughChangeset(changesetId, ref)` — base record + pending ops merged. Lets AI continue multi-step work against its own uncommitted state and lets preview render "after" values. Explicitly **not** DB branching (rejected: per-tenant runtime branching isn't practical on shared Postgres; Neon branches are per-database and suit CI, not tenant workspaces).
 - **Diff & preview:** field-level before/after per change; aggregate summary (N records touched, risk histogram, warnings); conflict markers.
 - **Conflict detection:** at review-refresh and again at commit, compare `baseVersion` to live version; drifted changes flagged `stale` → require re-validation + re-approval (never silently clobber).
-- **Approval:** `can('changeset.approve')` gated; risk-aware rules (high-risk requires explicit per-change approval; medium can be batch-approved; low auto-approvable per casper-ai policy); Q-3 (self-approval of high-risk) default: disallowed for orgs with >1 eligible approver.
+- **Approval:** `can('changeset.approve')` gated; risk-aware rules (high-risk requires explicit per-change approval; medium can be batch-approved; low auto-approvable per casper-ai policy); **no self-approval (Q-3 resolved, master-plan v0.4):** a human-authored high-risk change set requires a different approver in orgs > 1 seat; single-seat orgs exempt. AI-authored sets approved by the requesting user are review, not self-approval. Author deactivation (D-024) flags their pending change sets for review.
 - **Commit:** approved changes applied **through module write APIs** (records/workflow) in a single transaction where possible; partial commit = approved subset; every applied change emits normal domain events with `causationId = changeset` and `source` reflecting origin; inverse ops captured per applied change.
 - **Rollback:** one-click creates a *compensating* change set from stored inverse ops (auditable, re-approvable — not time travel); warns where subsequent edits make inversion lossy.
 - **Artifacts:** files/drafts attached to a change set's workspace (email drafts, generated reports) — blob-backed, surfaced in the Workspace AI surface; artifacts are *not* committed anywhere, they're deliverables.
@@ -44,9 +44,13 @@ The transactional workspace and change-set model — architectural bet #1 (maste
 - **P2:** rollback via compensating sets; stale-change re-review flow; batch approvals; commit resumability hardening; bulk-edit UX origin.
 - **P3:** feedback-proposal origin; simulation-result attachments on config publishes; richer config diffs.
 
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not committed** — the draft → diff → approve → commit → rollback flow is largely casper-web's job (the change-diff viewer is the product's trust UI), so a standalone surface would duplicate that. If a need appears before the web surface exists, `pnpm play changesets` would exercise: a draft-op builder showing *computed* risk (an assistant can't lower it); selective approve → commit emitting domain events with the changeset `causationId`; a stale-`baseVersion` conflict simulation.
+
 ## Open questions
 
-- Q-3 (master): self-approval rules for high-risk changes — finalize with first design partner.
+- ~~Q-3 (master): self-approval rules for high-risk changes~~ Resolved in master-plan v0.4 — see Approval above.
 - Overlay depth: does MVP AI need overlay reads at all, or is "propose then re-read live" enough? (Default: ship minimal overlay — merged read of own pending ops — since multi-step runs need it; no cross-changeset overlays.)
 
 ## Success criteria

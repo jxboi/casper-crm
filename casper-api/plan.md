@@ -1,6 +1,6 @@
 # casper-api — Plan
 
-**Status:** Draft v0.1 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (host/composition) | **Used by:** casper-web (run streams, long ops), external consumers (P4 public API) | **Aligned with:** master-plan v0.3 (D-001, D-011, D-015 superseded, D-018, D-019)
+**Status:** Draft v0.2 | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (host/composition) | **Used by:** casper-web (run streams, long ops), external consumers (P4 public API) | **Aligned with:** master-plan v0.5 (D-001, D-011, D-015 superseded, D-018, D-019, D-025)
 
 ## Purpose
 
@@ -35,6 +35,10 @@ The server-side execution surface of the modular monolith — deployed **on Verc
 - **P2:** digest cron; budget resets; CSV import workflow; workflow-failure + sweeper-lag alerting.
 - **P3:** mailbox sync workflows; measurement + retention jobs.
 - **P4:** public REST v1 + outbound webhooks + OpenAPI + key management.
+
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not committed** — `npx workflow inspect` and the Vercel dashboard already cover workflow/run/cron introspection, so a dedicated surface would mostly duplicate them. If a gap appears, `pnpm play api` would add: manual cron triggers (outbox sweeper, SLA scan) with `CRON_SECRET` handled by the kit; a run-stream reattach (`startIndex`) demo; an outbox-recovery demo (crash between commit and dispatch → sweeper redelivers) making the P0 "loses nothing" criterion visible.
 
 ## Open questions
 

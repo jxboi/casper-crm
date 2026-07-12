@@ -1,6 +1,6 @@
 # casper-comms — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine (integration) | **Phases:** 1 (drafts) → 2 (OAuth send) → 3/4 (ingestion, calendar) | **Depends on:** casper-records, casper-events, casper-changesets, casper-platform (crypto, blobs) | **Used by:** casper-ai (draft_email tool), casper-sales, casper-web | **Aligned with:** master-plan v0.3 (D-006, D-007, D-016, D-017, D-019)
+**Status:** Draft v0.2 | **Layer:** Engine (integration) | **Phases:** 1 (drafts) → 2 (OAuth send) → 3/4 (ingestion, calendar) | **Depends on:** casper-records, casper-events, casper-changesets, casper-platform (crypto, blobs) | **Used by:** casper-ai (draft_email tool), casper-sales, casper-web | **Aligned with:** master-plan v0.5 (D-006, D-007, D-016, D-017, D-019, D-025)
 
 ## Purpose
 
@@ -37,6 +37,10 @@ Email as a first-class citizen of the CRM — first as an *output* (assistant-dr
 ## Phasing
 
 (see Scope — phases are the structure of this module)
+
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not committed** — drafts surface through casper-web, and send/ingestion are provider-integration concerns better tested with fixtures. The one high-value candidate is the **inbound parser** (P3): if built, `pnpm play comms` would run sample email fixtures through the association engine (participants → contacts, domain → company, deal heuristics, with confidence) and an extraction dry-run that includes injection fixtures — email bodies attempting instruction smuggling must yield change-set proposals only (D-016).
 
 ## Open questions
 

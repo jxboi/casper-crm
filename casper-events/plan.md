@@ -1,6 +1,6 @@
 # casper-events — Plan
 
-**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.3 (D-005, D-012, D-016, D-017, D-019)
+**Status:** Draft v0.2 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.5 (D-005, D-012, D-016, D-017, D-019, D-025)
 
 ## Purpose
 
@@ -38,6 +38,10 @@ The nervous system. One append-only stream of typed events describing everything
 - **P1:** interaction events (export/copy/view basics); approval-request notifications; `last_activity_at` maintenance. Notification **email** delivery + prefs may slip to Phase 1c — with a single dogfood user (D-017), in-app is enough.
 - **P2:** digests; SLA notifications; audit export; retention config.
 - **P3:** richer interaction taxonomy for feedback detectors (defined jointly with casper-feedback); rebuild tooling hardened.
+
+## Playground (D-025 — deferred candidate, strong)
+
+Opt-in under D-025, **not committed for P0** to keep the initial set tight — but the strongest of the deferred candidates: a live event tail has no UI home until casper-web builds the timeline and notification views, so a surface here could pay off early. If built, `pnpm play events` would exercise: live domain + interaction event tail with envelope detail (actor, source, causation chain); an outbox/dispatcher inspector (cursors, retries, dead letters) with a manual sweeper trigger to demo at-least-once redelivery; timeline/audit projections for a chosen record.
 
 ## Open questions
 

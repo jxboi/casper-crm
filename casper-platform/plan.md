@@ -1,6 +1,6 @@
 # casper-platform — Plan
 
-**Status:** Draft v0.1 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** — | **Used by:** every module | **Aligned with:** master-plan v0.3 (D-001, D-002, D-011, D-012, D-016, D-019)
+**Status:** Draft v0.2 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** — | **Used by:** every module | **Aligned with:** master-plan v0.5 (D-001, D-002, D-011, D-012, D-016, D-019, D-025)
 
 ## Purpose
 
@@ -41,6 +41,10 @@ The shared kernel. Everything infrastructural that more than one module needs li
 - **P1:** blob storage real (attachments, artifacts); rate limits on AI endpoints.
 - **P2:** budget metering primitives for AI (counters with hard caps); metrics export.
 - **P3+:** retention jobs (event/audit pruning per org policy — PDPA, D-016).
+
+## Playground (D-025 — deferred candidate)
+
+Opt-in under D-025, **not built initially** — most of this module (migrations, crypto, config, rate limits) is better verified by the test kit than a UI. The one thing that might justify a surface is the **D-019 WDK spike**; if built, `pnpm play platform` would exercise a demo `defineWorkflow`/`defineCron` (per-step retries, `AppError` → `FatalError`/`RetryableError` mapping) plus a config/flags viewer. Until then the spike lives in tests + `npx workflow inspect`.
 
 ## Open questions
 

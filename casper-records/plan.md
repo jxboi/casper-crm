@@ -1,6 +1,6 @@
 # casper-records — Plan
 
-**Status:** Draft v0.1 | **Layer:** Engine | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth, casper-events | **Used by:** casper-workflow, casper-changesets, casper-ai, casper-sales, casper-comms, casper-web | **Aligned with:** master-plan v0.3 (D-002, D-012, D-013, D-017)
+**Status:** Draft v0.3 | **Layer:** Engine | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth, casper-events | **Used by:** casper-workflow, casper-changesets, casper-ai, casper-sales, casper-comms, casper-web | **Aligned with:** master-plan v0.5 (D-002, D-012, D-013, D-017, D-020, D-024, D-025)
 
 ## Purpose
 
@@ -13,9 +13,9 @@ The record engine — "Objects" in the objects/workflows/actions model. Configur
 - **Field registry:** types — text, long text, number, money (minor units + currency, D-012), date, datetime, select, multi-select, checkbox, user, relation, email, phone, URL, JSON (escape hatch). Each field: key, label, required?, unique?, default, options, validation rules, `sensitivity` flag (drives field masks in casper-auth + AI masking), archived?.
 - **Storage (D-013):** `records` table — id (uuidv7), org, workspace, type, `data` JSONB (GIN-indexed), owner, `version` (int, optimistic concurrency — the `baseVersion` change sets check), `last_activity_at` (maintained via events), search tsvector, timestamps, archived_at. Generated columns promoted for hot fields when profiling justifies.
 - **Validation:** field defs compile to zod schemas (cached per type+version). Same validator runs on direct writes and change-set commit re-validation.
-- **Write API:** `createRecord`, `updateRecord` (partial, field-mask-aware), `archiveRecord`, `transitionOwner`, bulk variants. Every write: `can()` check → validate → persist (+version bump) → emit domain event (`<type>.created/updated/...` with field-level diffs in payload).
+- **Write API:** `createRecord`, `updateRecord` (partial, field-mask-aware), `archiveRecord`, `transitionOwner`, bulk variants (bulk `transitionOwner` is the offboarding reassignment path, D-024). Every write: `can()` check → validate → persist (+version bump) → emit domain event (`<type>.created/updated/...` with field-level diffs in payload).
 - **Relations:** typed relation definitions (one-to-many / many-to-many, semantic labels e.g. "deal → primary contact"); `relations` join table; cascade rules (restrict/nullify on archive).
-- **Query engine:** the shared **Filter AST** (master-plan §6) → parameterized SQL. Operators include relative-date (`within_last`, `older_than`) and activity operators (`no_activity_within` via `last_activity_at`) — these power "neglected deals" for the assistant and views alike. Sorts, cursor pagination. Query-level permission scoping (workspace/team/own).
+- **Query engine:** the shared **Filter AST** (master-plan §6) → parameterized SQL. Operators include relative-date (`within_last`, `older_than`) and activity operators (`no_activity_within` via `last_activity_at`) — these power "neglected deals" for the assistant and views alike. Sorts, cursor pagination. Query-level permission scoping per D-020: reads are workspace-scoped only (open read — no per-row visibility filtering); `own`/`team` grant scopes apply to *write* authorization via `can()`, not to queries.
 - **Saved views:** named Filter AST + sort + visible columns + layout (`table` | `board(groupByField)` | `list`), personal or shared, per record type.
 - **Search:** Postgres FTS over label + text fields per org; typeahead for relation pickers.
 - **Import/export:** CSV export in P1 (cheap, and it emits the `export.clicked` interaction event — a feedback signal); CSV import with column mapping + dry-run report moved to **P2** (design-partner prerequisite — dogfood uses seed data, D-017); dedupe suggestions (email/domain match) P2.
@@ -41,6 +41,17 @@ Emits `<type>.created/updated/archived`, `task.completed`, `import.completed`, p
 - **P1:** board views; CSV export; activity operators; attachments; relation pickers; field sensitivity flags.
 - **P2:** CSV import (mapping + dry-run); dedupe suggestions; field editor UI hardening; generated-column promotion; uniqueness constraints.
 - **P3+:** type/field editing via change sets with preview; computed/rollup fields (only if product demands).
+
+## Playground (D-025 — committed surface)
+
+Dev-only surface in `casper-records/playground/`, mounted via `pnpm play records` (ships P0). Exercises:
+
+- **Type/field registry browser:** system + seeded product types, field defs, config versions.
+- **Record CRUD through the single write path** on dev data, acting as any principal — `can()` → validate → persist → event, visibly in that order.
+- **Validation tester:** feed values against the compiled zod schema for a chosen type/version.
+- **Filter AST builder:** compose filters (incl. relative-date and `no_activity_within` activity operators) → results + the generated parameterized SQL.
+- **Saved-view renderer:** table/board layouts; FTS search + relation-picker typeahead.
+- **Concurrency demo:** update with a stale `version` → `conflict` AppError (the change-set conflict substrate).
 
 ## Open questions
 
