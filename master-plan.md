@@ -1,6 +1,6 @@
 # Casper CRM — Master Plan
 
-**Version:** 0.3 &nbsp;|&nbsp; **Date:** 2026-07-11 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
+**Version:** 0.4 &nbsp;|&nbsp; **Date:** 2026-07-12 &nbsp;|&nbsp; **Stage:** Planning & refinement (no code yet)
 
 > Source references: [adaptive-crm-workflow-platform-summary.md](adaptive-crm-workflow-platform-summary.md), [ai-strategy.md](ai-strategy.md).
 > Those documents are the vision input. **This file is the source of truth for cross-module decisions.** Each module folder contains a `plan.md` that must stay aligned with this file (see §10 Alignment Protocol).
@@ -133,7 +133,10 @@ type Principal = {
 // Authorization — the single gate (casper-auth)
 can(principal, action: string, resource: ResourceRef, ctx?): Promise<Decision>
 // action strings: 'record.read' | 'record.update' | 'record.transition' |
-// 'record.field.write:<fieldKey>' | 'changeset.approve' | 'workflow.publish' | ...
+// 'record.field.read:<recordType>.<fieldKey>' | 'record.field.write:<recordType>.<fieldKey>' |
+// 'changeset.approve' | 'workflow.publish' | ...
+// (field actions are type-qualified: field keys are unique only within a record type)
+type Decision = { allow: boolean; reason: string; deniedFields?: string[] };
 
 // Record reference (casper-records)
 type RecordRef = { type: string; id: string };           // e.g. { type: 'deal', id: '...' }
@@ -199,7 +202,7 @@ Build: monorepo scaffold; multi-tenant auth (sign-up, org/workspace, invites, ro
 **Exit criteria:** two orgs can sign up and cannot see each other's data (verified by automated cross-tenant tests); creating/updating a record produces an audit entry and timeline item; deployed web + api + db with CI; `can()` gate used by every write path.
 
 ### Phase 1 — Sales CRM + narrow assistant MVP (dogfood, D-017)
-Modules: sales, workflow (v1), changesets (v1), ai (v1), comms (drafts only), feedback (capture only), web (CRM UI + AI surfaces + approvals). Split into three sequenced milestones — CRM fundamentals first, then the assistant:
+Modules: sales, workflow (v1), changesets (v1), ai (v1), auth (assistant principals + field masks — prerequisite for 1b), comms (drafts only), feedback (capture only), web (CRM UI + AI surfaces + approvals). Split into three sequenced milestones — CRM fundamentals first, then the assistant:
 
 **Phase 1a — Dogfood CRM (fundamentals first).**
 Build: Contact/Company/Deal + pipeline workflow (stages, transitions, SLA/neglect rules); views (table, board), tasks, timeline UX; seed-data script (demo dataset + a founder-pipeline variant).
@@ -280,6 +283,7 @@ Tracked from Phase 1 via casper-events; dashboards in Phase 2. Full list in ai-s
 
 ## 13. Changelog
 
+- **v0.4 (2026-07-12)** — Auth plan review alignment. §6: field-action grammar is now type-qualified (`record.field.read|write:<recordType>.<fieldKey>` — field keys are unique only within a record type) and the `Decision` return type of `can()` is defined. Phase 1 module list now includes auth (assistant principals + field masks are prerequisites for Phase 1b). casper-auth plan bumped to v0.2 in the same session: org-level memberships added to the data model (closes the D-003 gap), better-auth ↔ tenancy mapping specified, team-scope semantics defined (via record ownership), sign-in/session audit events, login rate limiting, account-linking stance, and enforce-vs-probe deny-event emission.
 - **v0.3 (2026-07-11)** — Vercel-first infrastructure per founder preference (D-019, supersedes D-015 / amends D-011): single Vercel project; Workflow DevKit for AI runs (per-turn durable steps, `createHook` approval pauses, resumable streams) and all background work; Vercel Cron; outbox drained via `waitUntil` + sweeper cron (pg-boss dropped); Neon via Marketplace, Vercel Blob, Flags SDK/Edge Config, Vercel Observability + WAF. Q-2 resolved (no Railway/Fly). WDK-maturity risk added with P0 spike + fallback. casper-api redefined as the in-project server surface, not a standalone service.
 - **v0.2 (2026-07-11)** — Refinement session with founder. Added D-017 (dogfood-first adoption path) and D-018 (tRPC web↔module layer). Phase 1 split into 1a (dogfood CRM) / 1b (M1 demo slice) / 1c (hardening); CSV import moved to Phase 2; PDPA enforcement + multi-user polish set as Phase 2 entry work. Dogfood metrics and dogfooding-blindness risk added. Q-1 and Q-4 resolved, Q-6 deferred, Q-7 reframed (Gmail test-mode for dogfood). D-003 full org→workspace→team hierarchy from P0 explicitly confirmed by founder.
 - **v0.1 (2026-07-11)** — Initial master plan. 12 modules defined; decisions D-001…D-016; phases 0–4; MVP scope; alignment protocol.
