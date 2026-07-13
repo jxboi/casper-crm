@@ -11,6 +11,11 @@ export type {
 } from "./envelope.js";
 
 export { emit, emitInteraction } from "./emit.js";
+export {
+  withEmissionContext,
+  currentEmission,
+  type EmissionContext,
+} from "./emission-context.js";
 export { dispatchPending, BUILTIN_CONSUMER_NAMES } from "./dispatch.js";
 export {
   on,

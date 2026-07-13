@@ -1,6 +1,7 @@
 import { AppError, newId, now, requestContext, withTx, type Tx } from "@casper/platform";
 import { domainEvents, interactionEvents } from "./schema.js";
 import { getEventSchema } from "./registry.js";
+import { currentEmission } from "./emission-context.js";
 import type { DomainEvent, EmitInput, InteractionInput } from "./envelope.js";
 
 /**
@@ -21,6 +22,10 @@ export async function emit<P>(tx: Tx, input: EmitInput<P>): Promise<DomainEvent<
     }
   }
 
+  // Ambient emission scope (D-026) supplies causation/source when the caller
+  // doesn't; an explicit EmitInput field still wins, and no scope = prior behavior.
+  const ambient = currentEmission();
+
   const event: DomainEvent<P> = {
     id: newId(),
     orgId: ctx.orgId,
@@ -28,11 +33,11 @@ export async function emit<P>(tx: Tx, input: EmitInput<P>): Promise<DomainEvent<
     type: input.type,
     subject: input.subject,
     actor: ctx.principal,
-    source: input.source ?? sourceForPrincipal(ctx.principal.kind),
+    source: input.source ?? ambient?.source ?? sourceForPrincipal(ctx.principal.kind),
     payload: input.payload,
     occurredAt: now().toISOString(),
     correlationId: ctx.correlationId,
-    causationId: input.causationId,
+    causationId: input.causationId ?? ambient?.causationId,
   };
 
   if (!event.workspaceId) {

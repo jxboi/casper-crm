@@ -1,6 +1,17 @@
 # casper-changesets — Plan
 
-**Status:** Draft v0.3 | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.5 (D-006, D-007, D-017, D-024, D-025)
+**Status:** P1 built (v0.4) | **Layer:** Engine | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-events, casper-auth | **Used by:** casper-ai (all mutations), casper-workflow (publishing), casper-feedback (proposals), casper-web (review/approve UX) | **Aligned with:** master-plan v0.5 (D-006, D-007, D-017, D-024, D-025, D-026)
+
+> **P1 built** (`@casper/changesets`): the change-set lifecycle (create → add change
+> → submit → selective approve/reject → commit), **computed risk** (D-007), draft-time
+> validation through each owning module's validator, `config_publish` + record ops
+> (`create`/`update`/`transition`/`delete`), commit **through module write APIs** under
+> the system principal with `causationId = changeset` on every applied event (D-026),
+> `baseVersion` conflict detection (stale → blocked), a minimal overlay
+> (`readThroughChangeset`), preview/diff, and `changeset.approve`-gated approval with
+> **no-self-approval** for high-risk in multi-seat orgs (single-seat exempt, D-017).
+> 8 tests green. **Deferred to P2/P3** (per phasing below): compensating-op rollback,
+> stale re-review flow, batch approvals, artifacts, cross-changeset overlays.
 
 ## Purpose
 

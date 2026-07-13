@@ -3,3 +3,5 @@ packages:
   - casper-auth
   - casper-events
   - casper-records
+  - casper-workflow
+  - casper-changesets

@@ -1,6 +1,24 @@
 # casper-workflow — Plan
 
-**Status:** Draft v0.2 | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.5 (D-006, D-007, D-014, D-017, D-025)
+**Status:** P1a + P1b built (v0.4) | **Layer:** Engine | **Phases:** 1+ (core), 3 (simulation/shadow/rollout) | **Depends on:** casper-records, casper-events, casper-platform | **Used by:** casper-sales, casper-ai, casper-changesets, casper-feedback, casper-web | **Aligned with:** master-plan v0.5 (D-006, D-007, D-014, D-017, D-025, D-026)
+
+> **P1a built** (`@casper/workflow`): versioned workflow definitions (zod, in-memory
+> registry) + the pure `evaluate()` + guarded `transition()` + simple assignment
+> (`fixed` / `by_field`) + the SLA/staleness scan (`scanSla`).
+>
+> **P1b built:** the **automation engine** — trigger–condition–action definitions,
+> a pure `evaluateAutomation()`, a persisted `automation_runs` queue with a
+> post-commit driver (`runPendingAutomations`), the 4 core actions (`create_task`,
+> `update_field`, `transition`, `notify`), and causation-depth loop protection —
+> plus **publishing primitives** (`applyConfigPublish`, `diffWorkflow`, version
+> storage) that **casper-changesets** drives via a `config_publish` op (D-026). Runs
+> as the system principal; effect events carry `causationId` + `source: "automation"`
+> via the events emission context. 18 workflow tests green. See `IMPLEMENTATION.md`.
+>
+> **Deferred:** event-payload automation conditions, same-automation/rate-cap loop
+> guards, `round_robin`, on-create assignment as an event consumer, an atomic
+> `stage_changed` write-path hook → later P1/P2; the dedicated stage column → P2;
+> simulation / shadow / gradual rollout → P3.
 
 ## Purpose
 
@@ -56,7 +74,7 @@ Dev-only surface in `casper-workflow/playground/`, mounted via `pnpm play workfl
 ## Open questions
 
 - Where does automation execution order matter (multiple automations match one event)? Default: deterministic order by definition id + no chaining beyond depth limit; revisit with real usage.
-- Stage stored in `records.data.stage` vs dedicated column (default: dedicated column on records table for index/board performance — coordinate with casper-records before P1 build).
+- ~~Stage stored in `records.data.stage` vs dedicated column.~~ **Resolved for P1a:** stage stays in `records.data.stage` (a plain `select` field). A dedicated column would require a coordinated `casper-records` schema + write-path change, which would break a self-contained increment; the Filter AST already filters/sorts `data.stage` via JSONB. Revisit the column as a **P2** board-performance optimization once index pressure is measured (coordinate with casper-records then).
 
 ## Success criteria
 
