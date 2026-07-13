@@ -143,6 +143,34 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  casper-sales:
+    dependencies:
+      '@casper/auth':
+        specifier: workspace:*
+        version: link:../casper-auth
+      '@casper/events':
+        specifier: workspace:*
+        version: link:../casper-events
+      '@casper/platform':
+        specifier: workspace:*
+        version: link:../casper-platform
+      '@casper/records':
+        specifier: workspace:*
+        version: link:../casper-records
+      '@casper/workflow':
+        specifier: workspace:*
+        version: link:../casper-workflow
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   casper-workflow:
     dependencies:
       '@casper/auth':

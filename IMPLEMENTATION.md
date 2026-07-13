@@ -187,6 +187,56 @@ on both create and update; redelivery does not double-notify.
    allowance under D-017): with a single dogfood user, the in-app inbox is enough. This
    increment is the inbox they build on.
 
+## casper-sales — P1a (Dogfood CRM: the first product, config-only)
+
+The first **product** module lands as `@casper/sales` (workspace member #7) — and it is
+the proof of the engine/product split: **record types, pipeline, automations, views,
+terminology, and seed data expressed purely as config over the existing engine, with
+zero engine code changes and no schema of its own.** All real and tested — **+6 tests**
+(`casper-sales/src/sales.test.ts`), whole repo **60 green** via `npx vitest run`.
+
+| Package | Scope delivered |
+|---|---|
+| `@casper/sales` (new, member #7) | **Record types** (`RecordTypeDef` config, D-013): **Company** (name, unique domain, industry/size/region), **Contact** (name, email, phone, title, company relation, source, notes), **Deal** (name, company + contacts + primaryContact relations, `sensitive` money `amount` in SGD minor units per D-012, stage, `stageEnteredAt`, expected/next-action dates, source, lostReason). **Pipeline workflow** (config on the workflow engine): `New → Qualified → Proposal → Negotiation → Won \| Lost`; guards — amount + expected close required to enter Proposal, lost reason required to enter Lost (reachable from any open stage via `from: "*"`); Won/Lost → Qualified re-open transitions. **Neglect** as two SLA rules (inactivity ≥14d, stage-age ≥30d) both emitting `record.neglected`. **Default automations**: Won ⇒ create high-priority onboarding task (the canonical example); Lost ⇒ notify (in-app). **Default views** (created per workspace, idempotent): Pipeline (board by stage), My open deals (personal), Neglected deals (shared), All companies, All contacts. **Terminology map** (engine noun/verb → sales labels) for casper-web. **Seed runner** `seedSalesData({ variant })` (D-017 dogfood data source): `demo` (3 companies, 4 contacts, 5 deals across the pipeline incl. 2 already-neglected) and `founder` (views only); idempotent, all writes through the records single write path so seeding produces real audit + timeline history. This is the function `pnpm play sales` will drive once the playground host lands. |
+
+Verified: a deal validates + writes through the records path with the config-defined
+default stage and a mirrored relation edge; the Proposal guard blocks without
+amount+close and passes once set (stamping `stageEnteredAt`); Lost requires a reason;
+the Won automation creates the onboarding task (`source: automation`, high priority,
+related to the deal); the Neglected-deals filter + the SLA scan surface exactly the
+overdue/stuck deals and emit `record.neglected`, excluding healthy and closed deals;
+`seedSalesData` is idempotent (re-run is a no-op for records) and wires company↔contact /
+deal relations.
+
+### Deviations & refinements (sales P1a, flagged per working style)
+
+1. **Manager-only re-open is not enforceable as pure config** — the plan asks that only
+   Manager+ re-open Won/Lost deals, but the guard model's `permission` is a single action
+   checked against the record, and the built-in grants separate manager from member by
+   *scope* (own vs team), not by a distinct re-open action. Per the plan's own rule ("if it
+   needs an engine change, that's a signal the engine needs a capability"), the re-open
+   transitions ship with the default `record.transition` permission; a dedicated
+   `record.reopen` action + grant is flagged for **casper-auth**, not hacked into product config.
+2. **"Next action date overdue" lives in the Neglected-deals view filter, not an SLA rule** —
+   SLA *kinds* are `inactivity` / `stage_age` only, so the third neglect signal is expressed
+   as a Filter-AST leaf (`nextActionDate older_than {0, day}`) in the view. Both read the same
+   records; the view is the authoritative neglected list, the SLA scan is the event trigger.
+3. **Neglect SLA rules are not stage-scoped to "open"** — an SLA rule scopes to one stage or
+   none, so the inactivity/stage-age rules can technically emit `record.neglected` on a closed
+   deal. The **view** filter restricts to open stages; a category-aware SLA scope (open/won/lost)
+   is a small engine capability flagged for **casper-workflow**. Low impact (a stale closed deal
+   is rare and the assistant re-checks open-ness in P1b).
+4. **"Closing this month" view deferred** — it needs a future-facing/absolute date-range
+   operator (`within_next` or a bounded range); the Filter AST has only past-relative operators
+   (`within_last`/`older_than`). Flagged for **casper-records**; the other four default views ship.
+5. **Single email/phone per contact, currency folded into the money value** — multi-email/phone
+   and a separate currency field are refinements; P1a uses one `email`/`phone` and lets the
+   money field carry its ISO currency (D-012). No engine limitation, just scope.
+6. **Seed data ages via past date fields, not clock manipulation** — `lastActivityAt` can't be
+   backdated through the write path, so seeded "neglected" deals are made so via a past
+   `nextActionDate` / an aged `stageEnteredAt` (the two neglect signals that are settable data),
+   keeping the seed a clean, side-effect-free set of normal writes.
+
 ## Not yet built (next P0 increments)
 
 auth OAuth login/session; the `casper-records` Filter-AST playground + `casper-auth`

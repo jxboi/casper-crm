@@ -1,0 +1,25 @@
+{
+  "name": "@casper/sales",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@casper/auth": "workspace:*",
+    "@casper/events": "workspace:*",
+    "@casper/platform": "workspace:*",
+    "@casper/records": "workspace:*",
+    "@casper/workflow": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
