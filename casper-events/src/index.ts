@@ -31,5 +31,23 @@ export {
   type TimelineEntry,
   type AuditEntry,
 } from "./queries.js";
+export {
+  addComment,
+  editComment,
+  deleteComment,
+  listComments,
+  parseMentions,
+  type CommentModel,
+  type AddCommentInput,
+  type EditCommentInput,
+} from "./comments.js";
+export {
+  listNotifications,
+  unreadCount,
+  markRead,
+  markAllRead,
+  NOTIFICATION_CONSUMER_NAMES,
+  type NotificationModel,
+} from "./notifications.js";
 export { eventsMigrations } from "./migrations.js";
 export * as schema from "./schema.js";

@@ -75,4 +75,46 @@ export const eventsMigrations: Migration[] = [
       ${tenantRlsSql("interaction_events")}
     `,
   },
+  {
+    module: "events",
+    version: 2,
+    name: "comments_notifications",
+    sql: `
+      CREATE TABLE comments (
+        id uuid PRIMARY KEY,
+        org_id uuid NOT NULL,
+        workspace_id uuid NOT NULL,
+        record_type text NOT NULL,
+        record_id text NOT NULL,
+        author_id uuid NOT NULL,
+        body text NOT NULL,
+        mentions jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL,
+        edited_at timestamptz,
+        deleted_at timestamptz
+      );
+      CREATE INDEX comments_record_idx ON comments (record_type, record_id, created_at);
+
+      CREATE TABLE notifications (
+        id uuid PRIMARY KEY,
+        org_id uuid NOT NULL,
+        workspace_id uuid NOT NULL,
+        user_id uuid NOT NULL,
+        type text NOT NULL,
+        title text NOT NULL,
+        body text,
+        subject_type text,
+        subject_id text,
+        source_event_id uuid NOT NULL,
+        data jsonb NOT NULL DEFAULT '{}'::jsonb,
+        read_at timestamptz,
+        created_at timestamptz NOT NULL
+      );
+      CREATE INDEX notifications_inbox_idx ON notifications (user_id, read_at, created_at);
+      CREATE UNIQUE INDEX notifications_dedupe ON notifications (source_event_id, user_id, type);
+
+      ${tenantRlsSql("comments")}
+      ${tenantRlsSql("notifications")}
+    `,
+  },
 ];

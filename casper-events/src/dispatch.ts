@@ -104,6 +104,10 @@ function timelineSummary(event: DomainEvent): { kind: string; summary: string } 
 }
 
 async function timelineProjector(event: DomainEvent, tx: Tx): Promise<void> {
+  // Comments are surfaced on the timeline from the `comments` table (live, so
+  // edits/deletes reflect immediately) — see `getTimeline`. Skipping them here
+  // avoids a duplicate, and avoids a projection entry that would go stale on edit.
+  if (event.type.startsWith("comment.")) return;
   const { kind, summary } = timelineSummary(event);
   await tx
     .insert(timelineEntries)

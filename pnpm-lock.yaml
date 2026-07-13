@@ -73,6 +73,9 @@ importers:
 
   casper-events:
     dependencies:
+      '@casper/auth':
+        specifier: workspace:*
+        version: link:../casper-auth
       '@casper/platform':
         specifier: workspace:*
         version: link:../casper-platform

@@ -1,6 +1,6 @@
 # casper-events — Plan
 
-**Status:** Draft v0.2 | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.5 (D-005, D-012, D-016, D-017, D-019, D-025)
+**Status:** P0 complete (v0.3) | **Layer:** Foundation | **Phases:** 0+ | **Depends on:** casper-platform, casper-auth | **Used by:** casper-records, casper-workflow, casper-changesets, casper-ai, casper-feedback, casper-comms, casper-web | **Aligned with:** master-plan v0.5 (D-005, D-012, D-016, D-017, D-019, D-025)
 
 ## Purpose
 
@@ -34,7 +34,7 @@ The nervous system. One append-only stream of typed events describing everything
 
 ## Phasing
 
-- **P0:** outbox + dispatcher + consumer registry; audit log; timeline projection v1; comments; minimal notifications (in-app only: mention, task assigned).
+- **P0:** ✅ outbox + dispatcher + consumer registry; audit log; timeline projection v1; comments; minimal notifications (in-app only: mention, task assigned).
 - **P1:** interaction events (export/copy/view basics); approval-request notifications; `last_activity_at` maintenance. Notification **email** delivery + prefs may slip to Phase 1c — with a single dogfood user (D-017), in-app is enough.
 - **P2:** digests; SLA notifications; audit export; retention config.
 - **P3:** richer interaction taxonomy for feedback detectors (defined jointly with casper-feedback); rebuild tooling hardened.

@@ -147,11 +147,51 @@ unblocked by the queue but not yet wired), an atomic `stage_changed` write-path 
 config (`workflow_definitions`/`automation_definitions`) remains **org-global** (no org_id) —
 the P1a simplification; multi-tenant config isolation is a later concern.
 
+## casper-events — P0 completion (comments + notifications)
+
+The events module reaches its **P0 scope**: the two remaining consumers of the
+stream — comments and in-app notifications — land as `@casper/events`. All real and
+tested — **+7 tests** (`casper-events/src/comments-notifications.test.ts`), whole repo
+**54 green** via `npx vitest run`.
+
+| Package | Scope delivered |
+|---|---|
+| `@casper/events` (P0 finish) | **Comments** (`addComment`/`editComment`/`deleteComment`/`listComments`): timeline-native authored entries in their own `comments` table (soft-deleted, so the audit trail + create event survive), each write also emitting a `comment.*` domain event; **@mentions** encoded `@[Name](id)`, parsed and validated against active workspace memberships (so a comment can only mention a real teammate); author-only edit/delete. **Notifications** (`listNotifications`/`unreadCount`/`markRead`/`markAllRead`): an in-app inbox filled by *consumers* of the stream — `notify-mentions` (on `comment.created`) and `notify-task-assigned` (on `task.created`/`task.updated`) — idempotent under redelivery via a `(sourceEventId, userId, type)` unique index. |
+
+Verified: a comment lists and lands on the record timeline; an @mention notifies the
+mentioned teammate but never the author; mentions of non-members are dropped; unread
+count + recipient-only `markRead`; author-only edit/delete with the timeline reflecting
+edits/deletions **live**; task-assignment notifies the assignee (not on self-assignment)
+on both create and update; redelivery does not double-notify.
+
+### Deviations & refinements (events P0 finish, flagged per working style)
+
+1. **Comments are surfaced on the timeline from the `comments` table, not from a
+   `timeline_entries` projection.** The generic timeline projector now *skips*
+   `comment.*` events; `getTimeline` merges `timeline_entries` with a live per-record
+   comment query. This keeps edits/deletes correct without the jsonb-update dance a
+   projected-then-patched entry would need, and still isn't an on-the-fly join over raw
+   `domain_events` (both sides are per-record and indexed). The plan's "authored timeline
+   entries" is honored; the storage placement is the refinement.
+2. **`@casper/events` now depends on `@casper/auth`** (the plan header already lists auth
+   as a dependency; no cycle — auth imports only platform). Used solely to validate
+   mention ids against `memberships` inside the author's own tx, so RLS prevents
+   cross-org mentions. Task-assignment needs no auth read — the assignee id rides the
+   event payload.
+3. **Notification rules read field-key conventions off the event payload, not the records
+   schema** (`data.assignee` on `task.created`, the `assignee` diff entry on
+   `task.updated`). Events must not import records (that would be a cycle), so the
+   consumer knows the *convention* without the type — a new rule is still added here
+   without touching any write path.
+4. **Email delivery + the per-user preference matrix stay deferred to Phase 1c** (plan
+   allowance under D-017): with a single dogfood user, the in-app inbox is enough. This
+   increment is the inbox they build on.
+
 ## Not yet built (next P0 increments)
 
 auth OAuth login/session; the `casper-records` Filter-AST playground + `casper-auth`
-`can()` playground (D-025) and the `tooling/playground` host/kit; events
-notifications/comments; CSV export (P1); config-snapshot persistence to
+`can()` playground (D-025) and the `tooling/playground` host/kit; CSV export (P1);
+config-snapshot persistence to
 `record_types`/`field_defs`; casper-web wiring (the current web app is a
 disconnected prototype). Relations cascade-on-archive is stubbed (edges maintained,
 enforcement deferred).
