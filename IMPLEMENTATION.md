@@ -273,7 +273,7 @@ the engine (`no transition 'qualified' → 'won'`), and `deal.stage_changed` hit
    graph's registries are populated) + `provision()` (create DB + migrate + seed **once**, cached
    on `globalThis`, holding the shared PGlite handle every graph's `setDb` is pointed at).
 
-### Scope (wired so far: Pipeline board + deal detail)
+### Scope (wired: Pipeline board + deal detail + all list views)
 
 Wired + verified on the real engine:
 - **Pipeline board** — reads, drag-to-transition, neglect badges.
@@ -283,15 +283,17 @@ Wired + verified on the real engine:
   the events projection (`getTimeline`). Verified in-browser: transitioning Proposal→Negotiation
   updated the stage, offered the new legal targets, and grew the timeline to 3 events
   (`deal.stage_changed` + `deal.updated` + `deal.created`).
+- **List views** — Deals (`app/deals/page.tsx`, via `loadPipeline`, with the all/mine/neglected/
+  closing filters) plus new **Companies** and **Contacts** pages (`loadDirectory`; the nav links
+  previously 404'd). All render seeded records with relations resolved and neglect badges.
 
-New BFF surface for detail: `getDealDetail`, `updateDealField`, `addDealTask`, `toggleDealTask`
-(all via `withEngine` → module API → `loadDetail` re-read); mappers `toWebTask` /
-`toWebTimelineEvent`.
+BFF surface: `loadPipeline`, `loadDirectory`, `moveDealStage`, `getDealDetail`, `updateDealField`,
+`addDealTask`, `toggleDealTask` (all `withEngine` → module API → mapper); mappers `toWebDeal` /
+`toWebCompany` / `toWebContact` / `toWebTask` / `toWebTimelineEvent`.
 
-**Still on the mock zustand store** (next increments): the deals / companies / contacts **list
-views**, and the **AI dock / feedback / change-set-approval** flows (they need casper-ai +
-casper-changesets wiring). The shell's "acting as" user switcher is also still mock (single dev
-principal until login lands).
+**Still on the mock zustand store** (next increments): the **AI dock / feedback / change-set-
+approval** flows (they need casper-ai + casper-changesets wiring). The shell's "acting as" user
+switcher is also still mock (single dev principal until login lands).
 
 ## Not yet built (next P0 increments)
 

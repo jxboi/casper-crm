@@ -50,6 +50,25 @@ export async function loadPipeline(): Promise<PipelineData> {
   });
 }
 
+export interface Directory {
+  companies: Company[];
+  contacts: Contact[];
+}
+
+/** Companies + contacts for the directory list views. */
+export async function loadDirectory(): Promise<Directory> {
+  return withEngine(async () => {
+    const [companies, contacts] = await Promise.all([
+      listRecords({ type: "company", limit: 500 }),
+      listRecords({ type: "contact", limit: 500 }),
+    ]);
+    return {
+      companies: companies.records.map(toWebCompany),
+      contacts: contacts.records.map(toWebContact),
+    };
+  });
+}
+
 export type MoveResult =
   | { ok: true; deals: Deal[] }
   | { ok: false; issues: string[] };

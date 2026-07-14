@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { neglectReasons } from "@/lib/pipeline";
 import { dateShort, money, relDays } from "@/lib/format";
-import type { Deal } from "@/lib/types";
+import type { Company, Deal, User } from "@/lib/types";
+import { loadPipeline } from "@/lib/server/actions";
 import { PageHeader } from "@/components/page-header";
 import { NeglectBadge, StageBadge } from "@/components/stage-badge";
 
@@ -21,13 +22,25 @@ const VIEWS: { key: View; label: string }[] = [
 
 export default function DealsPage() {
   const router = useRouter();
-  const deals = useStore((s) => s.deals);
-  const companies = useStore((s) => s.companies);
-  const users = useStore((s) => s.users);
-  const currentUserId = useStore((s) => s.currentUserId);
-  const startRun = useStore((s) => s.startRun);
+  const startRun = useStore((s) => s.startRun); // scripted AI dock stays on the mock store
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("all");
 
+  useEffect(() => {
+    void (async () => {
+      const data = await loadPipeline();
+      setDeals(data.deals);
+      setCompanies(data.companies);
+      setUsers(data.users);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Single dev principal until login lands, so "mine" resolves to that user.
+  const currentUserId = users[0]?.id;
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? "—";
   const owner = (id: string) => users.find((u) => u.id === id);
 
@@ -112,7 +125,7 @@ export default function DealsPage() {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center font-mono text-[12px] text-faint">
-                    No deals match this view.
+                    {loading ? "loading deals from the engine…" : "No deals match this view."}
                   </td>
                 </tr>
               )}

@@ -1,6 +1,6 @@
 # casper-web — Plan
 
-**Status:** v0.3 — **engine wiring in progress**: the Pipeline board **and deal detail** (reads via relations, guarded transitions, inline field edits, task CRUD, event-projected timeline) run on the real in-process engine (PGlite) via a Server-Functions BFF; list views + AI / feedback / approvals still on the mock store. Prototype UI otherwise complete. See IMPLEMENTATION.md "casper-web" for infra decisions (webpack + `.js`→`.ts` extensionAlias; module-graph-safe bootstrap; Server Functions instead of tRPC for now). | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.5 (D-001, D-010, D-017, D-018, D-019, D-020, D-024, D-025)
+**Status:** v0.3 — **engine wiring in progress**: the Pipeline board, deal detail (reads via relations, guarded transitions, inline field edits, task CRUD, event-projected timeline), and the Deals/Companies/Contacts **list views** run on the real in-process engine (PGlite) via a Server-Functions BFF; AI / feedback / approvals still on the mock store. Prototype UI otherwise complete. See IMPLEMENTATION.md "casper-web" for infra decisions (webpack + `.js`→`.ts` extensionAlias; module-graph-safe bootstrap; Server Functions instead of tRPC for now). | **Layer:** Application | **Phases:** 0+ | **Depends on:** all modules (composition surface) | **Used by:** end users | **Aligned with:** master-plan v0.5 (D-001, D-010, D-017, D-018, D-019, D-020, D-024, D-025)
 
 ## Purpose
 
