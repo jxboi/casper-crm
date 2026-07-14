@@ -1,21 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { useStore } from "@/lib/store";
 
-export function LostReasonDialog({ dealId, dealName, onClose }: { dealId: string; dealName: string; onClose: () => void }) {
+/**
+ * Collects the lost reason the pipeline guard requires before a deal can enter Lost.
+ * Transport-agnostic: the parent supplies `onConfirm`, which runs the real transition
+ * through the engine (see the pipeline page).
+ */
+export function LostReasonDialog({
+  dealName,
+  onConfirm,
+  onClose,
+}: {
+  dealName: string;
+  onConfirm: (reason: string) => void | Promise<void>;
+  onClose: () => void;
+}) {
   const [reason, setReason] = useState("");
-  const transition = useStore((s) => s.transition);
-  const toast = useStore((s) => s.toast);
+  const [busy, setBusy] = useState(false);
 
-  const submit = () => {
-    if (!reason.trim()) return;
-    const result = transition(dealId, "lost", { lostReason: reason.trim() });
-    if (result.ok) {
-      toast("ok", `${dealName} marked Lost`);
-    } else {
-      result.issues.forEach((i) => toast("err", i));
-    }
+  const submit = async () => {
+    if (!reason.trim() || busy) return;
+    setBusy(true);
+    await onConfirm(reason.trim());
+    setBusy(false);
     onClose();
   };
 
@@ -43,7 +51,7 @@ export function LostReasonDialog({ dealId, dealName, onClose }: { dealId: string
           </button>
           <button
             onClick={submit}
-            disabled={!reason.trim()}
+            disabled={!reason.trim() || busy}
             className="rounded-md bg-lost px-3 py-1.5 text-[12.5px] font-medium text-white disabled:opacity-40"
           >
             Mark Lost

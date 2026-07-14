@@ -237,11 +237,67 @@ deal relations.
    `nextActionDate` / an aged `stageEnteredAt` (the two neglect signals that are settable data),
    keeping the seed a clean, side-effect-free set of normal writes.
 
+## casper-web — first engine wiring (D-018 vertical slice)
+
+The web app stops being a disconnected prototype: the **Pipeline board now runs on the real
+engine, in-process, inside the Next server.** Seeded deals render through relations; drag-to-
+transition goes through the pure workflow guard → `can()` → the records write path →
+`stage_changed` → automations, and persists to PGlite. Verified end-to-end in the browser +
+via a throwaway route (since removed): a legal move persisted, an illegal move was rejected by
+the engine (`no transition 'qualified' → 'won'`), and `deal.stage_changed` hit the audit log.
+
+| Area | What landed |
+|---|---|
+| Workspace | `casper-web` joined the pnpm workspace (D-019 — one monorepo); npm lock removed; `@casper/*` + `drizzle-orm` + `@electric-sql/pglite` added as deps. |
+| Engine runtime (`lib/server/engine.ts`) | In-process bootstrap: registers every module, brings up **PGlite** (D-019, the Neon swap is prod-only), migrates, and seeds a dev org/workspace + the sales demo dataset. Dev **principal** = a Manager (OAuth login still deferred); every UI action runs through `can()` + the single write path under it. |
+| BFF (`lib/server/actions.ts`, `map.ts`, `context.ts`) | Next **Server Functions** as the web↔engine layer: `loadPipeline`, `moveDealStage` (marks-Lost writes the guard-required reason then transitions). `withEngine` opens the dev tenant context per call; mappers translate engine `RecordModel`s → the web view types, so the UI is untouched by the switch. |
+| UI | `app/pipeline/page.tsx` rewired from the zustand mock to the BFF (reads + transition + neglect badges on real data); `LostReasonDialog` made transport-agnostic (`onConfirm`). |
+
+### Infra decisions & gotchas (flagged — these recur for all future web wiring)
+
+1. **Transport = Next Server Functions, not tRPC (deviation from D-018).** Native to the App
+   Router, zero extra deps, lowest blast radius in this non-standard Next 16. The typed tRPC
+   client earns its place with the AI run streams (P1b); the transport is swappable without
+   touching the UI. Flagged for the plan.
+2. **`next dev --webpack`, not Turbopack.** The `@casper/*` packages use `moduleResolution:
+   bundler` but write NodeNext-style `.js` specifiers pointing at `.ts` sources. tsc/vitest
+   tolerate this; Turbopack has no `extensionAlias` and can't resolve `./x.js`→`./x.ts`. Webpack
+   can (`config.resolve.extensionAlias` in `next.config.ts`), so this app runs webpack. (Cleaner
+   long-term fix: make the engine imports extensionless, matching `bundler` resolution.)
+3. **PGlite is a `serverExternalPackages` entry; `@casper/*` are `transpilePackages`** (raw TS,
+   so the bundler must compile them — they can't be externalized like a built dep).
+4. **Module-graph duplication.** Next bundles Route Handlers / Server Actions / RSC into
+   *separate* module graphs, so the engine's module-level singletons (the record/workflow
+   registries, the `setDb` handle) are duplicated per graph. The bootstrap therefore splits into
+   `registerAll()` (idempotent in-memory registration, run on **every** `getEngine()` so each
+   graph's registries are populated) + `provision()` (create DB + migrate + seed **once**, cached
+   on `globalThis`, holding the shared PGlite handle every graph's `setDb` is pointed at).
+
+### Scope (wired so far: Pipeline board + deal detail)
+
+Wired + verified on the real engine:
+- **Pipeline board** — reads, drag-to-transition, neglect badges.
+- **Deal detail** (`app/deals/[id]/page.tsx`) — company + contacts resolved through relations;
+  stage controls via `moveDealStage`; inline field edits (`updateDealField`) and task add/toggle
+  (`addDealTask`/`toggleDealTask`) through the records write path; the **timeline** rendered from
+  the events projection (`getTimeline`). Verified in-browser: transitioning Proposal→Negotiation
+  updated the stage, offered the new legal targets, and grew the timeline to 3 events
+  (`deal.stage_changed` + `deal.updated` + `deal.created`).
+
+New BFF surface for detail: `getDealDetail`, `updateDealField`, `addDealTask`, `toggleDealTask`
+(all via `withEngine` → module API → `loadDetail` re-read); mappers `toWebTask` /
+`toWebTimelineEvent`.
+
+**Still on the mock zustand store** (next increments): the deals / companies / contacts **list
+views**, and the **AI dock / feedback / change-set-approval** flows (they need casper-ai +
+casper-changesets wiring). The shell's "acting as" user switcher is also still mock (single dev
+principal until login lands).
+
 ## Not yet built (next P0 increments)
 
 auth OAuth login/session; the `casper-records` Filter-AST playground + `casper-auth`
 `can()` playground (D-025) and the `tooling/playground` host/kit; CSV export (P1);
 config-snapshot persistence to
-`record_types`/`field_defs`; casper-web wiring (the current web app is a
-disconnected prototype). Relations cascade-on-archive is stubbed (edges maintained,
-enforcement deferred).
+`record_types`/`field_defs`; **casper-web wiring beyond the Pipeline board** (deal detail,
+list views, AI/feedback/approvals still on the mock store — see the casper-web section above).
+Relations cascade-on-archive is stubbed (edges maintained, enforcement deferred).

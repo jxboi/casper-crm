@@ -6,3 +6,4 @@ packages:
   - casper-workflow
   - casper-changesets
   - casper-sales
+  - casper-web
