@@ -40,11 +40,15 @@ See [master-plan.md](master-plan.md) — the source of truth for cross-module de
 
 Modules interact only through their exported public API — no reaching into another module's tables or internals.
 
-## Status — Phase 0 (records-first)
+## Status — a working dogfood slice
 
-The **records engine to its P0 scope** plus the foundation it depends on are built and tested — real code on the data path, no stubs. Delivered so far: `@casper/platform` (Drizzle over PGlite/Neon, tenancy context, migration runner, RLS), `@casper/auth` (principals, tenancy entities, `can()`), `@casper/events` (event envelope, transactional outbox, audit log + timeline projections), and `@casper/records` (field registry, compiled-zod validation, the single write path, Filter AST → SQL, saved views, FTS).
+Real code on the data path, no stubs, **60 passing tests** (`npx vitest run`). What's built:
 
-Verified by 18 passing tests including the Phase 0 exit criterion — **tenant isolation enforced by Postgres RLS**, not just app code. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the full breakdown and deviations from the plans.
+- **Foundation + engine (P0/P1):** `@casper/platform` (Drizzle over PGlite/Neon, tenancy context, migration runner, RLS), `@casper/auth` (principals, tenancy entities, `can()`), `@casper/events` (event envelope, transactional outbox, audit log + timeline, comments + in-app notifications), `@casper/records` (field registry, compiled-zod validation, the single write path, Filter AST → SQL, saved views, FTS), `@casper/workflow` (pure `evaluate()` stage machine, guarded transitions, SLA/neglect scans, the automation engine), `@casper/changesets` (draft → risk → approve → commit through module APIs, config publishing).
+- **Product (P1a):** `@casper/sales` — the Sales CRM as **configuration only** (Contact/Company/Deal types, the pipeline + neglect rules, default automations + views, an idempotent seed runner). Zero engine changes: proof of the engine/product split.
+- **Application:** `casper-web` — the **Pipeline board, deal detail, and the Deals/Companies/Contacts list views run on the real engine**, executed in-process (PGlite) behind a Server-Functions BFF (D-018). Drag/click a deal and transitions flow through the pure workflow guards → `can()` → the records write path → events → the timeline. The AI dock, feedback widget, and change-set approvals are still on a mock store (next increments); login is deferred, so the app runs as a single dev principal.
+
+Includes the Phase 0 exit criterion — **tenant isolation enforced by Postgres RLS**, not just app code. See [IMPLEMENTATION.md](IMPLEMENTATION.md) for the full breakdown and deviations from the plans.
 
 ## Getting started
 
@@ -52,12 +56,19 @@ Requires **Node ≥ 22** and **pnpm 9**.
 
 ```bash
 pnpm install
-pnpm test        # runs the suite on in-process PGlite — no DB server needed
+npx vitest run   # the full suite on in-process PGlite — no DB server needed
 pnpm typecheck
-pnpm build
 ```
 
-Tests use PGlite (real Postgres in WASM), so RLS, generated columns, and FTS all behave; the Neon serverless driver is the production swap behind config, with no module changes.
+> **Note on the harness:** `pnpm test` currently reports "no test files" per-package (a known monorepo vitest-config quirk, see IMPLEMENTATION.md); run `npx vitest run` from the repo root.
+
+Run the web app (dogfood slice, seeded demo data):
+
+```bash
+cd casper-web && pnpm dev   # http://localhost:3000  (Next.js on webpack — see below)
+```
+
+The whole modular monolith runs **in-process inside the Next server** on PGlite (real Postgres in WASM), so RLS, generated columns, and FTS all behave; the Neon serverless driver is the production swap behind config. The web app runs `next dev --webpack` (not Turbopack) because the engine packages use `bundler`-resolution `.js` specifiers that need webpack's `extensionAlias` — see IMPLEMENTATION.md ("casper-web").
 
 ## Tech stack
 
