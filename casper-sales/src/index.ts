@@ -6,9 +6,11 @@
 
 import { defineRecordType } from "@casper/records";
 import { defineWorkflow, defineAutomation } from "@casper/workflow";
+import { registerAssistant } from "@casper/ai";
 import { SALES_RECORD_TYPES } from "./record-types.js";
 import { dealPipeline } from "./pipeline.js";
 import { SALES_AUTOMATIONS } from "./automations.js";
+import { salesFollowupAssistant } from "./assistant.js";
 
 /**
  * Register the sales product config into the in-memory registries (record types,
@@ -21,6 +23,7 @@ export function registerSalesModule(): void {
   for (const type of SALES_RECORD_TYPES) defineRecordType(type);
   defineWorkflow(dealPipeline);
   for (const automation of SALES_AUTOMATIONS) defineAutomation(automation);
+  registerAssistant(salesFollowupAssistant);
 }
 
 // Record types (config-as-data)
@@ -49,6 +52,9 @@ export {
   NEGLECTED_DEALS_FILTER,
   type SeededViews,
 } from "./views.js";
+
+// Assistant (governed digital worker, defined as data — casper-ai executes it)
+export { salesFollowupAssistant, SALES_FOLLOWUP_ASSISTANT_PRINCIPAL_ID } from "./assistant.js";
 
 // Terminology
 export { salesTerminology, salesTerm, type Terminology } from "./terminology.js";

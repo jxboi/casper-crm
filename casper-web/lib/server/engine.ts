@@ -17,6 +17,8 @@ import {
 import { eventsMigrations } from "@casper/events";
 import { registerRecordsModule } from "@casper/records";
 import { registerWorkflowModule } from "@casper/workflow";
+import { registerChangesetsModule } from "@casper/changesets";
+import { registerAiModule } from "@casper/ai";
 import { registerSalesModule, seedSalesData } from "@casper/sales";
 
 /**
@@ -59,6 +61,8 @@ function registerAll(): void {
   registerMigrations(eventsMigrations);
   registerRecordsModule();
   registerWorkflowModule();
+  registerChangesetsModule();
+  registerAiModule();
   registerSalesModule();
 }
 

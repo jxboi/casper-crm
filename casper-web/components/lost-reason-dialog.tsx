@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Collects the lost reason the pipeline guard requires before a deal can enter Lost.
@@ -19,6 +19,14 @@ export function LostReasonDialog({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const submit = async () => {
     if (!reason.trim() || busy) return;
     setBusy(true);
@@ -30,6 +38,9 @@ export function LostReasonDialog({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/30 p-4" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Mark ${dealName} as Lost`}
         className="rise w-full max-w-sm rounded-xl border border-line bg-panel p-5 shadow-card"
         onClick={(e) => e.stopPropagation()}
       >

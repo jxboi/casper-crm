@@ -5,6 +5,7 @@ import { createRecord, getRecord, listRecords, updateRecord } from "@casper/reco
 import { getTimeline } from "@casper/events";
 import { getActiveVersion, transition } from "@casper/workflow";
 import type { Company, Contact, Deal, Task, TimelineEvent, User } from "@/lib/types";
+import { neglectReasons } from "@/lib/pipeline";
 import { withEngine } from "./context";
 import {
   toWebCompany,
@@ -195,6 +196,56 @@ async function mutateThenReload(dealId: string, mutate: () => Promise<void>): Pr
     return { ok: false, issues: [errorMessage(e)] };
   }
 }
+
+// ---- assistant run (AI dock) ------------------------------------------------
+
+/**
+ * A neglected deal enriched with the bits the assistant run needs to draft a
+ * follow-up: the company name and the primary contact (for the email draft).
+ * Neglect is computed with the same `neglectReasons` the rest of the web UI
+ * uses (D-014 demo clock), so the dock, deals list, and board agree.
+ */
+export interface NeglectedDeal {
+  deal: Deal;
+  companyName: string;
+  contactName: string | null;
+  contactEmail: string | null;
+}
+
+/** The current principal's open, neglected deals — the input to the dock's run. */
+export async function loadNeglectedDeals(): Promise<NeglectedDeal[]> {
+  return withEngine(async () => {
+    const version = getActiveVersion("deal") ?? 1;
+    const [dealList, companyList, contactList] = await Promise.all([
+      listRecords({ type: "deal", limit: 200 }),
+      listRecords({ type: "company", limit: 200 }),
+      listRecords({ type: "contact", limit: 500 }),
+    ]);
+    const companies = new Map(companyList.records.map((r) => [r.id, toWebCompany(r)]));
+    const contacts = new Map(contactList.records.map((r) => [r.id, toWebContact(r)]));
+
+    const out: NeglectedDeal[] = [];
+    for (const rec of dealList.records) {
+      const deal = toWebDeal(rec, version);
+      if (neglectReasons(deal).length === 0) continue;
+      const primaryId = (rec.data.primaryContact as string) ?? deal.contactIds[0] ?? null;
+      const contact = primaryId ? contacts.get(primaryId) ?? null : null;
+      out.push({
+        deal,
+        companyName: companies.get(deal.companyId)?.name ?? "",
+        contactName: contact?.name ?? null,
+        contactEmail: contact?.email ?? null,
+      });
+    }
+    return out;
+  });
+}
+
+/**
+ * The assistant run's follow-ups now commit through the real `casper-changesets`
+ * module (draft → review → commit-through-write-path), not a direct-write shim. See
+ * `lib/server/changesets.ts` for that BFF.
+ */
 
 function errorMessage(e: unknown): string {
   return isAppError(e) ? e.message : e instanceof Error ? e.message : String(e);

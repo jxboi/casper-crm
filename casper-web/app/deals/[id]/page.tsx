@@ -17,6 +17,7 @@ import {
   type DealDetail,
 } from "@/lib/server/actions";
 import { PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/skeleton";
 import { NeglectBadge, StageBadge } from "@/components/stage-badge";
 import { Timeline } from "@/components/timeline";
 import { LostReasonDialog } from "@/components/lost-reason-dialog";
@@ -225,7 +226,9 @@ export default function DealDetailPage() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const d = await getDealDetail(id);
+    // A malformed/unknown id makes the engine throw — treat it as not-found
+    // rather than leaving the page stuck on the loading state.
+    const d = await getDealDetail(id).catch(() => null);
     setDetail(d);
     setLoading(false);
   }, [id]);
@@ -236,8 +239,43 @@ export default function DealDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <p className="font-mono text-[11px] text-faint">loading deal from the engine…</p>
+      <div className="flex h-full flex-col" aria-busy>
+        <div className="px-6 pt-5">
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <div className="flex flex-col gap-2 px-6 pb-4 pt-6">
+          <Skeleton className="h-3 w-48" />
+          <Skeleton className="h-6 w-72" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-6 pb-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-4 shadow-card">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className={`h-3.5 ${i % 2 ? "w-28" : "w-36"}`} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 rounded-xl border border-line bg-panel p-4 shadow-card">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 rounded-xl border border-line bg-panel p-4 shadow-card">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="flex gap-3">
+                  <Skeleton className="size-6 rounded-full" />
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -263,7 +301,7 @@ export default function DealDetailPage() {
           <ArrowLeft size={13} /> Pipeline
         </Link>
       </div>
-      <PageHeader kicker={`casper-records · deal:${deal.id}`} title={deal.name}>
+      <PageHeader kicker={`casper-records · deal:${deal.id.slice(0, 8)}`} title={deal.name}>
         <div className="flex items-center gap-2">
           <StageBadge stage={deal.stage} />
           {reasons.length > 0 && <NeglectBadge reasons={reasons} />}

@@ -66,6 +66,7 @@ export interface ChangeSetModel {
   title: string;
   intent: string | null;
   status: ChangeSetStatus;
+  createdAt: string;
   changes: ChangeModel[];
 }
 

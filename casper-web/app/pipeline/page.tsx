@@ -9,6 +9,7 @@ import { money } from "@/lib/format";
 import type { Company, Deal, StageKey, User } from "@/lib/types";
 import { loadPipeline, moveDealStage } from "@/lib/server/actions";
 import { PageHeader } from "@/components/page-header";
+import { BoardSkeleton } from "@/components/skeleton";
 import { NeglectBadge } from "@/components/stage-badge";
 import { LostReasonDialog } from "@/components/lost-reason-dialog";
 
@@ -18,12 +19,16 @@ function DealCard({
   deal,
   company,
   owner,
+  dragging,
   onDragStart,
+  onDragEnd,
 }: {
   deal: Deal;
   company?: Company;
   owner?: User;
+  dragging: boolean;
   onDragStart: (id: string) => void;
+  onDragEnd: () => void;
 }) {
   const reasons = neglectReasons(deal);
   return (
@@ -31,12 +36,17 @@ function DealCard({
       href={`/deals/${deal.id}`}
       draggable
       onDragStart={() => onDragStart(deal.id)}
-      className="group block rounded-lg border border-line bg-panel p-3 shadow-card transition-shadow hover:border-line-strong"
+      onDragEnd={onDragEnd}
+      className={`group block rounded-lg border border-line bg-panel p-3 shadow-card transition-[box-shadow,opacity] hover:border-line-strong ${
+        dragging ? "opacity-40" : ""
+      }`}
     >
       <div className="flex items-start gap-1.5">
         <GripVertical size={13} className="mt-0.5 flex-none text-line-strong opacity-0 group-hover:opacity-100" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-medium">{deal.name}</p>
+          <p className="truncate text-[13.5px] font-medium" title={deal.name}>
+            {deal.name}
+          </p>
           <p className="truncate text-[12px] text-muted">{company?.name}</p>
         </div>
       </div>
@@ -82,6 +92,13 @@ export default function PipelinePage() {
 
   const companyOf = (id: string) => companies.find((c) => c.id === id);
   const ownerOf = (id: string) => users.find((u) => u.id === id);
+
+  // Fires on every drag end (including drops outside the board) so no stale
+  // drag highlight survives an abandoned drag.
+  const endDrag = () => {
+    setDragId(null);
+    setOverStage(null);
+  };
 
   const drop = async (to: StageKey) => {
     setOverStage(null);
@@ -129,7 +146,7 @@ export default function PipelinePage() {
 
       <div className="min-h-0 flex-1 overflow-x-auto px-6 pb-6">
         {loading ? (
-          <p className="px-1 py-8 font-mono text-[11px] text-faint">loading pipeline from the engine…</p>
+          <BoardSkeleton />
         ) : (
           <div className="flex h-full min-w-max gap-3">
             {COLUMNS.map((col) => {
@@ -170,11 +187,19 @@ export default function PipelinePage() {
                         deal={d}
                         company={companyOf(d.companyId)}
                         owner={ownerOf(d.ownerId)}
+                        dragging={dragId === d.id}
                         onDragStart={setDragId}
+                        onDragEnd={endDrag}
                       />
                     ))}
                     {colDeals.length === 0 && (
-                      <p className="px-1 py-4 text-center font-mono text-[10.5px] text-faint">empty</p>
+                      <p
+                        className={`rounded-lg border border-dashed px-1 py-4 text-center font-mono text-[10.5px] ${
+                          dragId ? "border-line-strong text-muted" : "border-transparent text-faint"
+                        }`}
+                      >
+                        {dragId ? "drop here" : "no deals"}
+                      </p>
                     )}
                   </div>
                 </div>

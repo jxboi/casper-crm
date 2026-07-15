@@ -33,6 +33,14 @@ export function FeedbackWidget() {
   useEffect(() => {
     if (open) bodyRef.current?.focus();
   }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const reset = () => {
     setBody("");
@@ -194,6 +202,7 @@ export function FeedbackWidget() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Send feedback"
+        aria-expanded={open}
         className={`flex size-11 items-center justify-center rounded-full shadow-card transition-colors ${
           open ? "bg-ink text-panel" : "bg-accent text-accent-ink hover:brightness-105"
         }`}

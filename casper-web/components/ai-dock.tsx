@@ -14,9 +14,13 @@ export function AIDock() {
   const setTab = useStore((s) => s.setDockTab);
   const run = useStore((s) => s.run);
   const drafts = useStore((s) => s.drafts);
-  const changeSet = useStore((s) => s.changeSets.find((c) => c.id === s.run.changeSetId));
+  const changeSet = useStore((s) => s.run.changeSet);
   const startRun = useStore((s) => s.startRun);
   const answerClarify = useStore((s) => s.answerClarify);
+  const reviewRunChange = useStore((s) => s.reviewRunChange);
+  const reviewAllRun = useStore((s) => s.reviewAllRun);
+  const commitRunChangeSet = useStore((s) => s.commitRunChangeSet);
+  const committing = useStore((s) => s.committing !== null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -163,7 +167,18 @@ export function AIDock() {
             )}
             {changeSet && (
               <>
-                <DiffViewer changeSet={changeSet} compact />
+                <DiffViewer
+                  changeSet={changeSet}
+                  compact
+                  handlers={{
+                    onApprove: (id) => void reviewRunChange(id, "approved"),
+                    onReject: (id) => void reviewRunChange(id, "rejected"),
+                    onApproveAll: () => void reviewAllRun("approved"),
+                    onRejectAll: () => void reviewAllRun("rejected"),
+                    onCommit: () => void commitRunChangeSet(),
+                    committing,
+                  }}
+                />
                 <Link href="/approvals" className="text-[12px] text-faint underline hover:text-muted">
                   Open in the Approvals inbox
                 </Link>
@@ -175,8 +190,8 @@ export function AIDock() {
 
       <div className="border-t border-line px-4 py-2.5">
         <p className="font-mono text-[9.5px] leading-relaxed text-faint">
-          scripted M1 demo slice — the real run engine streams from casper-api via SSE (D-019) · zero unapproved
-          mutations, by construction (D-006)
+          live run — the real casper-ai engine drives the model + tools and streams over SSE (D-019) · zero
+          unapproved mutations, by construction (D-006)
         </p>
       </div>
     </aside>

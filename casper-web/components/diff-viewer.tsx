@@ -2,10 +2,25 @@
 
 import { Check, ListChecks, Mail, PencilLine, X } from "lucide-react";
 import type { Change, ChangeSet } from "@/lib/types";
-import { useStore } from "@/lib/store";
 
 const OP_ICON = { create_task: ListChecks, update_field: PencilLine, email_draft: Mail } as const;
 const OP_LABEL = { create_task: "create task", update_field: "update field", email_draft: "email draft" } as const;
+
+/**
+ * The trust surface (D-006): a change set rendered as per-change before/after with
+ * per-change approve/reject and a commit action. It is **presentational** — the caller
+ * (dock run or Approvals inbox) supplies handlers that drive the real engine and hands
+ * back a refreshed change set. When no handlers are given (committed history), it renders
+ * read-only. Engine review is one-way: clicking the already-active decision is a no-op.
+ */
+export interface DiffViewerHandlers {
+  onApprove: (changeId: string) => void;
+  onReject: (changeId: string) => void;
+  onApproveAll: () => void;
+  onRejectAll: () => void;
+  onCommit: () => void;
+  committing?: boolean;
+}
 
 function RiskChip({ risk }: { risk: Change["risk"] }) {
   const tone =
@@ -15,8 +30,17 @@ function RiskChip({ risk }: { risk: Change["risk"] }) {
   );
 }
 
-function ChangeRow({ change, changeSetId, editable }: { change: Change; changeSetId: string; editable: boolean }) {
-  const setApproval = useStore((s) => s.setChangeApproval);
+function ChangeRow({
+  change,
+  editable,
+  onApprove,
+  onReject,
+}: {
+  change: Change;
+  editable: boolean;
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
+}) {
   const Icon = OP_ICON[change.op];
   return (
     <div
@@ -46,7 +70,7 @@ function ChangeRow({ change, changeSetId, editable }: { change: Change; changeSe
         <div className="flex flex-none gap-1">
           <button
             aria-label="Approve change"
-            onClick={() => setApproval(changeSetId, change.id, change.approval === "approved" ? "pending" : "approved")}
+            onClick={() => change.approval !== "approved" && onApprove?.(change.id)}
             className={`rounded-md p-1.5 ${
               change.approval === "approved" ? "bg-won text-white" : "border border-line text-faint hover:border-won hover:text-won"
             }`}
@@ -55,7 +79,7 @@ function ChangeRow({ change, changeSetId, editable }: { change: Change; changeSe
           </button>
           <button
             aria-label="Reject change"
-            onClick={() => setApproval(changeSetId, change.id, change.approval === "rejected" ? "pending" : "rejected")}
+            onClick={() => change.approval !== "rejected" && onReject?.(change.id)}
             className={`rounded-md p-1.5 ${
               change.approval === "rejected" ? "bg-lost text-white" : "border border-line text-faint hover:border-lost hover:text-lost"
             }`}
@@ -76,10 +100,19 @@ function ChangeRow({ change, changeSetId, editable }: { change: Change; changeSe
   );
 }
 
-export function DiffViewer({ changeSet, compact = false }: { changeSet: ChangeSet; compact?: boolean }) {
-  const setAll = useStore((s) => s.setAllApprovals);
-  const commit = useStore((s) => s.commitChangeSet);
-  const editable = changeSet.status === "in_review";
+export function DiffViewer({
+  changeSet,
+  compact = false,
+  handlers,
+}: {
+  changeSet: ChangeSet;
+  compact?: boolean;
+  /** Omit for a read-only view (e.g. committed history). */
+  handlers?: DiffViewerHandlers;
+}) {
+  const reviewable = changeSet.status === "in_review" || changeSet.status === "approved";
+  const editable = reviewable && !!handlers;
+  const committing = handlers?.committing ?? false;
   const approved = changeSet.changes.filter((c) => c.approval === "approved").length;
   const rejected = changeSet.changes.filter((c) => c.approval === "rejected").length;
   const pending = changeSet.changes.length - approved - rejected;
@@ -97,6 +130,11 @@ export function DiffViewer({ changeSet, compact = false }: { changeSet: ChangeSe
               committed
             </span>
           )}
+          {changeSet.status === "rejected" && (
+            <span className="rounded-full bg-lost-soft px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-lost">
+              rejected
+            </span>
+          )}
         </div>
         {!compact && (
           <p className="mt-1 text-[12px] text-muted">
@@ -105,19 +143,19 @@ export function DiffViewer({ changeSet, compact = false }: { changeSet: ChangeSe
         )}
       </div>
 
-      {editable && (
+      {editable && handlers && (
         <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-4 py-2">
           <span className="font-mono text-[10.5px] text-faint">
-            zero mutations until commit — everything below is a draft
+            zero mutations until commit — everything below is staged
           </span>
           <button
-            onClick={() => setAll(changeSet.id, "approved")}
+            onClick={handlers.onApproveAll}
             className="ml-auto rounded-md border border-line px-2 py-1 font-mono text-[10.5px] text-muted hover:border-won hover:text-won"
           >
             approve all
           </button>
           <button
-            onClick={() => setAll(changeSet.id, "rejected")}
+            onClick={handlers.onRejectAll}
             className="rounded-md border border-line px-2 py-1 font-mono text-[10.5px] text-muted hover:border-lost hover:text-lost"
           >
             reject all
@@ -127,7 +165,13 @@ export function DiffViewer({ changeSet, compact = false }: { changeSet: ChangeSe
 
       <div>
         {changeSet.changes.map((c) => (
-          <ChangeRow key={c.id} change={c} changeSetId={changeSet.id} editable={editable} />
+          <ChangeRow
+            key={c.id}
+            change={c}
+            editable={editable}
+            onApprove={handlers?.onApprove}
+            onReject={handlers?.onReject}
+          />
         ))}
       </div>
 
@@ -136,13 +180,13 @@ export function DiffViewer({ changeSet, compact = false }: { changeSet: ChangeSe
           <span className="text-won">{approved} approved</span> · <span className="text-lost">{rejected} rejected</span> ·{" "}
           {pending} pending
         </span>
-        {editable && (
+        {editable && handlers && (
           <button
-            onClick={() => commit(changeSet.id)}
-            disabled={approved === 0}
+            onClick={handlers.onCommit}
+            disabled={approved === 0 || committing}
             className="ml-auto rounded-md bg-accent px-3.5 py-1.5 text-[12.5px] font-medium text-accent-ink disabled:opacity-40"
           >
-            Commit {approved > 0 ? `${approved} approved` : ""}
+            {committing ? "Committing…" : `Commit ${approved > 0 ? `${approved} approved` : ""}`}
           </button>
         )}
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, Columns3, Inbox, MessageSquarePlus, Sparkles, Table2, Users } from "lucide-react";
@@ -25,10 +26,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const users = useStore((s) => s.users);
   const dockOpen = useStore((s) => s.dockOpen);
   const toggleDock = useStore((s) => s.toggleDock);
-  const pendingApprovals = useStore((s) => s.changeSets.filter((c) => c.status === "in_review").length);
+  const pendingApprovals = useStore((s) => s.pendingApprovals);
+  const refreshApprovalsCount = useStore((s) => s.refreshApprovalsCount);
   const newFeedback = useStore(
     (s) => s.feedback.filter((f) => f.status === "new" && !f.mergedInto).length
   );
+
+  // Seed the approvals badge from the engine once the shell mounts; run/commit flows
+  // keep it fresh thereafter via refreshApprovalsCount.
+  useEffect(() => {
+    void refreshApprovalsCount();
+  }, [refreshApprovalsCount]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -44,6 +52,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] ${
                   active ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-panel-2 hover:text-ink"
                 }`}
@@ -68,7 +77,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
             pipeline v{PIPELINE.version} · active
           </span>
-          <span className="font-mono text-[10px] text-faint">demo mode — in-memory data</span>
+          <span className="font-mono text-[10px] text-faint">demo mode — local engine data</span>
         </div>
       </aside>
 

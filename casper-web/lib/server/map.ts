@@ -1,6 +1,12 @@
 import type { RecordModel } from "@casper/records";
 import type { TimelineEntry } from "@casper/events";
-import type { Company, Contact, Deal, StageKey, Task, TimelineEvent } from "@/lib/types";
+import type {
+  ChangePreview,
+  ChangeSetModel,
+  ChangeSetPreview,
+  ChangeModel,
+} from "@casper/changesets";
+import type { Change, ChangeSet, Company, Contact, Deal, StageKey, Task, TimelineEvent } from "@/lib/types";
 
 /**
  * Map engine `RecordModel`s (generic typed records) onto the web app's view types.
@@ -67,6 +73,112 @@ export function toWebTask(rec: RecordModel): Task {
     dueDate: (d.due as string) ?? "",
     done: d.status === "done",
     origin: (origin === "automation" || origin === "ai" ? origin : "manual") as Task["origin"],
+  };
+}
+
+/* ---- change sets (approval flow) -------------------------------------------
+   Translate the engine's generic, ops-as-data change set + its preview (before/
+   after per change) into the deal-centric web view types the DiffViewer renders.
+   Only the follow-up producer's ops occur in practice — a `create` task record
+   and an `update` to a deal field — so the mapper is shaped around those; other
+   ops degrade to a plain summary row rather than crashing. The web payload is now
+   display-only: commit applies the engine change set itself, not this payload. */
+
+const CS_STATUS: Record<ChangeSetModel["status"], ChangeSet["status"]> = {
+  draft: "in_review",
+  in_review: "in_review",
+  approved: "approved",
+  committing: "committed",
+  committed: "committed",
+  rejected: "rejected",
+  rolled_back: "rejected",
+};
+
+const FIELD_LABEL: Record<string, string> = {
+  nextActionDate: "next action date",
+  expectedCloseDate: "expected close date",
+};
+
+function displayValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+export function toWebChangeSet(
+  cs: ChangeSetModel,
+  preview: ChangeSetPreview,
+  dealName: (id: string) => string,
+): ChangeSet {
+  const status = CS_STATUS[cs.status];
+  // For committed sets the live-computed before/after is post-commit (before ==
+  // after), so it is suppressed — we show the resulting value only.
+  const committed = status === "committed";
+  const previews = new Map(preview.changes.map((p) => [p.changeId, p]));
+  return {
+    id: cs.id,
+    title: cs.title,
+    intent: cs.intent ?? "",
+    authorName: cs.origin === "ai_run" || cs.origin === "feedback_proposal" ? "Sales Assistant" : "You",
+    origin: cs.origin === "ai_run" ? "ai_run" : "manual",
+    status,
+    createdAt: cs.createdAt,
+    changes: cs.changes.map((c) => toWebChange(c, previews.get(c.id), dealName, committed)),
+  };
+}
+
+function toWebChange(
+  c: ChangeModel,
+  p: ChangePreview | undefined,
+  dealName: (id: string) => string,
+  committed: boolean,
+): Change {
+  const t = c.target;
+  const common = { id: c.id, risk: c.risk, approval: c.approval };
+
+  // create task → "create task" row (the deal it belongs to is the related record).
+  if (c.op === "create" && t.kind === "record" && t.type === "task") {
+    const payload = (c.payload ?? {}) as { title?: string; due?: string; relatedTo?: { id?: string } };
+    const dealId = payload.relatedTo?.id ?? "";
+    return {
+      ...common,
+      op: "create_task",
+      dealId,
+      dealName: dealName(dealId),
+      summary: `Task: “${payload.title ?? "Follow up"}”${payload.due ? ` · due ${payload.due}` : ""}`,
+      payload: { taskTitle: payload.title, dueDate: payload.due },
+    };
+  }
+
+  // update deal field → "update field" row with before/after from the preview.
+  if (c.op === "update" && t.kind === "record" && t.type === "deal") {
+    const patch = (c.payload ?? {}) as Record<string, unknown>;
+    const fieldKey = Object.keys(patch)[0] ?? "";
+    const before = (p?.before as Record<string, unknown> | null | undefined)?.[fieldKey];
+    const after = (p?.after as Record<string, unknown> | null | undefined)?.[fieldKey] ?? patch[fieldKey];
+    const knownField = fieldKey === "nextActionDate" || fieldKey === "expectedCloseDate";
+    return {
+      ...common,
+      op: "update_field",
+      dealId: t.id ?? "",
+      dealName: dealName(t.id ?? ""),
+      summary: FIELD_LABEL[fieldKey] ?? fieldKey,
+      before: committed ? undefined : displayValue(before),
+      after: displayValue(after),
+      payload: knownField ? { fieldKey, value: displayValue(patch[fieldKey]) } : {},
+    };
+  }
+
+  // Any other op (delete / transition / config_publish) — not produced by the wired
+  // follow-up run; render a plain summary so the row is never blank.
+  const label = t.kind === "record" ? (t.id ? dealName(t.id) : t.type) : t.configType;
+  return {
+    ...common,
+    op: "update_field",
+    dealId: t.kind === "record" ? (t.id ?? "") : "",
+    dealName: label,
+    summary: `${c.op}${p ? ` → ${displayValue(p.after)}` : ""}`,
+    payload: {},
   };
 }
 

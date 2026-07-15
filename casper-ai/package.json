@@ -1,5 +1,5 @@
 {
-  "name": "@casper/sales",
+  "name": "@casper/ai",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,13 +11,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@casper/ai": "workspace:^",
+    "@anthropic-ai/sdk": "^0.70.1",
     "@casper/auth": "workspace:*",
+    "@casper/changesets": "workspace:*",
     "@casper/events": "workspace:*",
     "@casper/platform": "workspace:*",
     "@casper/records": "workspace:*",
     "@casper/workflow": "workspace:*",
-    "zod": "^3.24.1"
+    "drizzle-orm": "^0.38.3",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

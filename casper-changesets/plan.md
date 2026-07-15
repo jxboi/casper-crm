@@ -8,9 +8,10 @@
 > (`create`/`update`/`transition`/`delete`), commit **through module write APIs** under
 > the system principal with `causationId = changeset` on every applied event (D-026),
 > `baseVersion` conflict detection (stale → blocked), a minimal overlay
-> (`readThroughChangeset`), preview/diff, and `changeset.approve`-gated approval with
-> **no-self-approval** for high-risk in multi-seat orgs (single-seat exempt, D-017).
-> 8 tests green. **Deferred to P2/P3** (per phasing below): compensating-op rollback,
+> (`readThroughChangeset`), preview/diff, `changeset.approve`-gated approval with
+> **no-self-approval** for high-risk in multi-seat orgs (single-seat exempt, D-017),
+> and `listChangeSets` (workspace-scoped, status-filterable, newest-first) backing
+> casper-web's Approvals inbox. 9 tests green. **Deferred to P2/P3** (per phasing below): compensating-op rollback,
 > stale re-review flow, batch approvals, artifacts, cross-changeset overlays.
 
 ## Purpose

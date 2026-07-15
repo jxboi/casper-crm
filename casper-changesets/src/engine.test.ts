@@ -42,6 +42,7 @@ import {
   approveAll,
   commitChangeSet,
   getChangeSet,
+  listChangeSets,
   readThroughChangeset,
   previewChangeSet,
 } from "./index.js";
@@ -324,5 +325,21 @@ describe("changesets engine (P1b)", () => {
     expect(preview.summary.risk).toMatchObject({ medium: 1, high: 1 });
     const configChange = preview.changes.find((c) => c.op === "config_publish");
     expect(configChange?.configDiff?.some((line) => line.includes("proposal"))).toBe(true);
+  });
+
+  it("lists a workspace's change sets newest-first, isolated by workspace and filterable by status", async () => {
+    const older = await as(w.alice, () => createChangeSet({ title: "Older", origin: "manual" }));
+    const newer = await as(w.alice, () => createChangeSet({ title: "Newer", origin: "manual" }));
+    await as(w.alice, () => submitForReview(newer.id));
+
+    // A change set in a different workspace must not leak into this list.
+    const other = await seedWorld("globex");
+    await as(other.alice, () => createChangeSet({ title: "Other org", origin: "manual" }));
+
+    const all = await as(w.alice, () => listChangeSets());
+    expect(all.map((cs) => cs.id)).toEqual([newer.id, older.id]); // newest first, acme only
+
+    const inReview = await as(w.alice, () => listChangeSets({ status: ["in_review"] }));
+    expect(inReview.map((cs) => cs.id)).toEqual([newer.id]);
   });
 });

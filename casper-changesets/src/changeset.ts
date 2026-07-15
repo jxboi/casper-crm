@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import {
   AppError,
   isAppError,
@@ -59,28 +59,56 @@ async function loadChanges(tx: Tx, changesetId: string): Promise<ChangeModel[]> 
   return rows.map(rowToChange);
 }
 
+function rowToChangeSet(row: typeof changesets.$inferSelect, changeList: ChangeModel[]): ChangeSetModel {
+  return {
+    id: row.id,
+    orgId: row.orgId,
+    workspaceId: row.workspaceId,
+    author: {
+      kind: row.authorKind as Principal["kind"],
+      id: row.authorId,
+      orgId: row.orgId,
+      workspaceId: row.workspaceId,
+    },
+    origin: row.origin as Origin,
+    title: row.title,
+    intent: row.intent,
+    status: row.status as ChangeSetStatus,
+    createdAt: row.createdAt.toISOString(),
+    changes: changeList,
+  };
+}
+
 export async function getChangeSet(id: string): Promise<ChangeSetModel> {
   return withTx(async (tx) => {
     const rows = await tx.select().from(changesets).where(eq(changesets.id, id)).limit(1);
     const row = rows[0];
     if (!row) throw AppError.notFound(`change set ${id} not found`);
-    const changeList = await loadChanges(tx, id);
-    return {
-      id: row.id,
-      orgId: row.orgId,
-      workspaceId: row.workspaceId,
-      author: {
-        kind: row.authorKind as Principal["kind"],
-        id: row.authorId,
-        orgId: row.orgId,
-        workspaceId: row.workspaceId,
-      },
-      origin: row.origin as Origin,
-      title: row.title,
-      intent: row.intent,
-      status: row.status as ChangeSetStatus,
-      changes: changeList,
-    };
+    return rowToChangeSet(row, await loadChanges(tx, id));
+  });
+}
+
+/**
+ * List the current workspace's change sets, newest first, optionally narrowed to a
+ * set of statuses (e.g. `["in_review", "approved"]` for an approvals inbox). Scoped to
+ * `ctx.workspaceId` — RLS already org-scopes the rows; this adds the workspace filter.
+ */
+export async function listChangeSets(filter?: {
+  status?: ChangeSetStatus[];
+}): Promise<ChangeSetModel[]> {
+  const ctx = requestContext.require();
+  const wsId = requireWorkspace(ctx.workspaceId);
+  return withTx(async (tx) => {
+    const conds = [eq(changesets.workspaceId, wsId)];
+    if (filter?.status && filter.status.length > 0) {
+      conds.push(inArray(changesets.status, filter.status));
+    }
+    const rows = await tx
+      .select()
+      .from(changesets)
+      .where(and(...conds))
+      .orderBy(desc(changesets.createdAt));
+    return Promise.all(rows.map(async (row) => rowToChangeSet(row, await loadChanges(tx, row.id))));
   });
 }
 

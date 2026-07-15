@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Company } from "@/lib/types";
 import { loadDirectory } from "@/lib/server/actions";
 import { PageHeader } from "@/components/page-header";
+import { TableSkeletonRows } from "@/components/skeleton";
 
 const HEADERS = ["Company", "Domain", "Industry", "Size", "Region"];
 
@@ -29,13 +30,14 @@ export default function CompaniesPage() {
             <thead>
               <tr className="border-b border-line bg-panel-2/50 text-left">
                 {HEADERS.map((h) => (
-                  <th key={h} className="px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-faint">
+                  <th key={h} scope="col" className="px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-faint">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
+              {loading && <TableSkeletonRows rows={5} cols={HEADERS.length} />}
               {companies.map((c) => (
                 <tr key={c.id} className="border-b border-line last:border-b-0 hover:bg-panel-2/40">
                   <td className="px-4 py-2.5 font-medium">{c.name}</td>
@@ -45,10 +47,10 @@ export default function CompaniesPage() {
                   <td className="px-4 py-2.5 text-muted">{c.region || "—"}</td>
                 </tr>
               ))}
-              {companies.length === 0 && (
+              {!loading && companies.length === 0 && (
                 <tr>
                   <td colSpan={HEADERS.length} className="px-4 py-10 text-center font-mono text-[12px] text-faint">
-                    {loading ? "loading companies from the engine…" : "No companies yet."}
+                    No companies yet.
                   </td>
                 </tr>
               )}

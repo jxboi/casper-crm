@@ -5,5 +5,6 @@ packages:
   - casper-records
   - casper-workflow
   - casper-changesets
+  - casper-ai
   - casper-sales
   - casper-web

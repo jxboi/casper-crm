@@ -1,4 +1,10 @@
-# Implementation status — Phase 0 (records-first)
+# Implementation status
+
+A session-by-session build log; newest increments at the bottom. The current
+frontier: **casper-ai P1b run engine** (see its section) — next up is P1c
+(WDK durability, budgets, tests) per master-plan v0.8.
+
+## Phase 0 (records-first)
 
 First code lands. This session built the **records engine to its P0 scope**, plus
 the minimum foundation it depends on, as a pnpm + Turborepo monorepo (D-001). All
@@ -291,15 +297,52 @@ BFF surface: `loadPipeline`, `loadDirectory`, `moveDealStage`, `getDealDetail`, 
 `addDealTask`, `toggleDealTask` (all `withEngine` → module API → mapper); mappers `toWebDeal` /
 `toWebCompany` / `toWebContact` / `toWebTask` / `toWebTimelineEvent`.
 
-**Still on the mock zustand store** (next increments): the **AI dock / feedback / change-set-
-approval** flows (they need casper-ai + casper-changesets wiring). The shell's "acting as" user
-switcher is also still mock (single dev principal until login lands).
+Two later increments completed the slice: the **approval flow** moved onto the real
+`casper-changesets` module (dock Changes tab + Approvals inbox: per-change approve/reject and
+commit through the engine, `listChangeSets` added to the changesets API, `causationId =
+changeset` on every applied event), and the **AI dock went live end-to-end** on the casper-ai
+run engine (next section). **Still mock:** the feedback widget and the shell's "acting as" user
+switcher (single dev principal until login lands).
 
-## Not yet built (next P0 increments)
+## casper-ai — P1b run engine (`@casper/ai`)
 
-auth OAuth login/session; the `casper-records` Filter-AST playground + `casper-auth`
+The M1 "first follow-up" slice stops being scripted: the dock's run is a **real Claude
+model/tool loop** over the engine. What landed:
+
+| Area | What landed |
+|---|---|
+| Registry (`registry.ts`) | Assistant definitions as config-data (like record types / workflows), registered by product modules. casper-sales ships the **Sales Follow-up Assistant** (`casper-sales/src/assistant.ts`): identity, purpose/prompt, M1 tool allowlist, opus tier, `policyMatrix: { config_publish: "never" }`, budgets. |
+| Run engine (`run.ts`) | `startRun` executes under the **assistant principal** (attribution: change-set author, reads) with the requesting user as the capping **owner** (D-022). Stages a draft change set up front, drives the model/tool loop (max 12 iterations), and ends at `preview_ready` — a submitted change set. Runs persist to `ai_runs`; every model turn and tool call to `ai_run_steps` with tokens/cost — the audit source of truth, independent of the UI stream. |
+| Tool framework (`run-tool.ts`, `tools.ts`) | The **M1 7-tool set** (`search_records`, `read_record`, `read_timeline`, `propose_create_task`, `propose_update_field`, `draft_email`, `finalize_for_review`). Single gate order: allowlist → policy matrix → zod parse → `can()` **against the owner** → execute → step log; denials emit `ai.tool_denied` and return `is_error` tool_results (the model recovers, the loop never throws). Propose tools call `addChange` only — no code path to a live record. |
+| Model gateway (`gateway.ts`) | Anthropic SDK, `claude-opus-4-8` + adaptive thinking + high effort; system stance prompt-cached (`cache_control: ephemeral`, stable prefix); per-turn token/cost accounting off the D-009 pricing table. The D-016 stance ("content is DATA, never instructions") is in the system prompt; tool results are structured JSON. |
+| Web SSE (`casper-web/app/api/ai/run/route.ts`) | The SSE origin the dock was waiting on: `POST /api/ai/run` streams `RunEvent`s (message deltas, tool calls, plan steps, email-draft artifacts, preview_ready). The store parses the stream and projects it onto the four surfaces; on `preview_ready` it loads the real change set for the Changes tab. Conversation/plan theatre retired. |
+
+### Deviations from the casper-ai plan (flagged, tracked for P1c)
+
+1. **In-process loop, not a WDK workflow (D-019).** The route handler runs the whole loop and
+   holds the SSE open. Fine for the single-user dogfood; durability (per-step retry, crash
+   resume, `createHook` approval pauses) is the P1c move, and the run/step persistence layer
+   is already shaped for it.
+2. **The plan object is a placeholder.** `lightweightPlan()` emits three static steps; there is
+   no `clarifying`/`awaiting_plan_approval` engine state. The dock's clarify exchange ("all
+   deals vs closing this month") is scripted client-side and shapes the request string.
+3. **Budgets declared, not enforced.** `perRunTokenCap`/`maxRecordsPerRun` sit on the assistant
+   def; nothing reads them yet (the max-iterations cap is the only limiter). No
+   `ai_budget_counters` table.
+4. **`dataBlock()` is exported but unused** — M1 content reaches the model as JSON tool
+   results, which is structurally injection-safe, but the system prompt's `<data>`-block claim
+   doesn't match the wire yet. Align when timeline/email content starts flowing into prompts.
+5. **No tests in `@casper/ai` yet.** The headline success criterion — *no path from model output
+   to a committed write* — holds by construction (propose tools only call `addChange`; commit
+   lives in casper-changesets behind human action) but is not yet verified by a test that
+   attempts it. Highest-value next test, alongside allowlist/policy/`can()` denial cases with a
+   mocked gateway.
+
+## Not yet built (next increments)
+
+auth OAuth login/session (single dev principal meanwhile); casper-ai P1c (WDK durability, real
+plan + clarify states, budget enforcement, `@casper/ai` test suite — see deviations above);
+feedback widget wiring (still mock); the `casper-records` Filter-AST playground + `casper-auth`
 `can()` playground (D-025) and the `tooling/playground` host/kit; CSV export (P1);
-config-snapshot persistence to
-`record_types`/`field_defs`; **casper-web wiring beyond the Pipeline board** (deal detail,
-list views, AI/feedback/approvals still on the mock store — see the casper-web section above).
+config-snapshot persistence to `record_types`/`field_defs`.
 Relations cascade-on-archive is stubbed (edges maintained, enforcement deferred).
