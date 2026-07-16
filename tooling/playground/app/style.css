@@ -1,0 +1,7 @@
+:root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #101214; color: #e9edf1; }
+body { margin: 0; } main { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+header { border-bottom: 1px solid #30363d; margin-bottom: 28px; } nav { display: flex; gap: 12px; margin: 20px 0; }
+a { color: #8cc8ff; } form { display: grid; gap: 12px; max-width: 620px; } label { display: grid; gap: 5px; }
+input, select, button { padding: 9px 11px; border-radius: 6px; border: 1px solid #3d444d; background: #181b20; color: inherit; }
+button { cursor: pointer; background: #1f6feb; border-color: #1f6feb; } .json { padding: 18px; overflow: auto; background: #181b20; border: 1px solid #30363d; border-radius: 8px; }
+.status { color: #8b949e; font-size: 14px; }

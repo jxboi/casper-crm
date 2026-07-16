@@ -17,6 +17,7 @@ export { config, loadConfig, type Config } from "./config.js";
 
 export {
   type Db,
+  type DbClient,
   type Tx,
   type Executor,
   getDb,
@@ -24,6 +25,8 @@ export {
   hasDb,
   resetDb,
   createPgliteDb,
+  createNeonDb,
+  createDb,
 } from "./db/client.js";
 export { withTx, withSystemTx } from "./db/tx.js";
 export {

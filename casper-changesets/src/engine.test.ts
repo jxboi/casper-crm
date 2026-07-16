@@ -15,7 +15,7 @@ import {
   createUser,
   createWorkspace,
   addMembership,
-} from "@casper/auth";
+} from "@casper/auth/testkit";
 import { eventsMigrations, schema as eventsSchema } from "@casper/events";
 import {
   registerRecordsModule,

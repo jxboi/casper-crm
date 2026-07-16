@@ -1,7 +1,6 @@
 // casper-auth — identity, tenancy, and the single authorization gate `can()`.
-// AuthN (better-auth GitHub OAuth + email/password) is deferred within this
-// module: records and the rest of the engine depend on principals + `can()`, not
-// on the login flow, so P0 ships the authorization core and tenancy first.
+// Authentication is hosted by casper-web through Better Auth; this module owns
+// the shared identity rows, tenant provisioning, principal resolution, and can().
 
 export type { Principal, PrincipalKind } from "@casper/platform";
 export { systemPrincipal, SYSTEM_PRINCIPAL_ID } from "@casper/platform";
@@ -19,6 +18,7 @@ export {
   type RecordAction,
   type AdminAction,
   type EngineAction,
+  type CollaborationAction,
   type FieldWriteAction,
   isFieldWrite,
   fieldWriteKey,
@@ -36,13 +36,17 @@ export {
 } from "./roles.js";
 
 export {
-  createOrg,
-  createUser,
   createWorkspace,
   createTeam,
   addToTeam,
-  addMembership,
+  provisionInitialTenant,
+  resolvePrincipal,
+  inviteMember,
+  acceptInvitation,
+  changeMemberRole,
   type Org,
+  type ResolvedPrincipal,
+  type InvitationModel,
 } from "./service.js";
 
 export { authMigrations } from "./migrations.js";

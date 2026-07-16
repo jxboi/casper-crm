@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
+    "typecheck": "tsc --noEmit",
     "start": "next start"
   },
   "dependencies": {
     "@casper/ai": "workspace:^",
+    "@casper/api": "workspace:*",
     "@casper/auth": "workspace:*",
     "@casper/changesets": "workspace:*",
     "@casper/events": "workspace:*",
@@ -17,17 +19,21 @@
     "@casper/sales": "workspace:*",
     "@casper/workflow": "workspace:*",
     "@electric-sql/pglite": "^0.2.17",
-    "drizzle-orm": "^0.38.3",
+    "@vercel/functions": "^3.7.5",
+    "better-auth": "^1.6.23",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "zod": "^3.24.1",
+    "workflow": "^4.6.0",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",

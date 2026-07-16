@@ -1,8 +1,8 @@
 # Implementation status
 
-A session-by-session build log; newest increments at the bottom. The current
-frontier: **casper-ai P1b run engine** (see its section) — next up is P1c
-(WDK durability, budgets, tests) per master-plan v0.8.
+A session-by-session build log; newest increments at the bottom. **Phase 0 is
+closed**; the current frontier is Phase 1 durability, budgets, tests, and dogfood
+hardening per master-plan v0.9.
 
 ## Phase 0 (records-first)
 
@@ -327,8 +327,8 @@ model/tool loop** over the engine. What landed:
    no `clarifying`/`awaiting_plan_approval` engine state. The dock's clarify exchange ("all
    deals vs closing this month") is scripted client-side and shapes the request string.
 3. **Budgets declared, not enforced.** `perRunTokenCap`/`maxRecordsPerRun` sit on the assistant
-   def; nothing reads them yet (the max-iterations cap is the only limiter). No
-   `ai_budget_counters` table.
+   def; nothing reads them yet (the max-iterations cap is the only limiter). The
+   `ai_budget_counters` table exists in the ai migration but nothing writes it.
 4. **`dataBlock()` is exported but unused** — M1 content reaches the model as JSON tool
    results, which is structurally injection-safe, but the system prompt's `<data>`-block claim
    doesn't match the wire yet. Align when timeline/email content starts flowing into prompts.
@@ -338,11 +338,56 @@ model/tool loop** over the engine. What landed:
    attempts it. Highest-value next test, alongside allowlist/policy/`can()` denial cases with a
    mocked gateway.
 
+## casper-platform — Neon binding (D-019 prod swap)
+
+Infra provisioned and the config swap made real, verified against the live database:
+
+- **Provisioned via Vercel Marketplace:** Vercel project `casper-crm` (linked, GitHub-connected)
+  + Neon resource `casper-crm-db` (free plan), env vars injected for all environments and
+  pulled to the repo-root `.env.local` (gitignored).
+- **`createDb()` factory** in `casper-platform/src/db/client.ts`: `DATABASE_URL` → Neon over
+  the **WebSocket driver** (`drizzle-orm/neon-serverless` + `Pool`) — never neon-http, which is
+  stateless and cannot hold the interactive transactions `withTx`'s RLS pattern needs; no
+  `DATABASE_URL` → PGlite (on-disk via `PGLITE_DATA`, else in-memory). `Db`'s `$client` is now
+  `PGlite | Pool`; the migration runner branches on it (PGlite `exec()` batch vs an
+  unparameterized `query()` — node-postgres's multi-statement simple protocol).
+- **Bootstrap migration fix (Neon-only failure PGlite masked):** Neon's login user is not
+  superuser, so `SET LOCAL ROLE casper_app` fails with 42501 without membership — the
+  bootstrap migration now runs `GRANT casper_app TO CURRENT_USER` (harmless no-op under
+  PGlite's superuser).
+- **Verified on live Neon** (throwaway script, since removed): all 9 module migrations applied
+  cleanly (28 tables — generated columns, GIN/FTS included), `withTx` ran as `casper_app` with
+  tx-local session vars and RLS filtering, second `runMigrations` a no-op. The schema now
+  exists on `casper-crm-db`.
+- **Deliberately not switched:** `casper-web`'s `engine.ts` still calls `createPgliteDb()` —
+  its `provision()` creates a dev org + seeds demo data unconditionally per process, which
+  must become idempotent/gated before the app may point at a durable database. That gating is
+  the next deploy-prep increment (with login + Vercel root-directory config).
+- Driver pinned at `@neondatabase/serverless@0.10.4` (lockfile-wide peer); upgrade to ^1.0.2
+  is a separate low-risk chore.
+
+## Phase 0 closure — 2026-07-16
+
+- Better Auth email/password signup and sessions are live; signup provisions an isolated
+  org/workspace owner membership. GitHub OAuth is config-ready and only renders when its
+  provider credentials are present.
+- `casper-api` is the shared composition root for requests and jobs. The transactional outbox
+  has a tested recovery sweeper and a deployed WDK workflow; Vercel Hobby's daily cron starts
+  a durable 24-hour loop that drains once per minute.
+- Public Phase 0 mutations call `assertCan()`; unsafe tenant provisioning is confined to the
+  explicit `@casper/auth/testkit` subpath. Invitations and role changes are functional and
+  covered by authorization/acceptance tests.
+- `pnpm play auth` and `pnpm play records` boot the dev-only `can()` and Filter-AST surfaces;
+  both passed browser checks and are excluded from Vercel uploads.
+- CI is frozen install → typecheck → test → build. Closure gate: 12/12 packages typecheck,
+  63 tests pass, and the Next production build includes auth, health, cron, and workflow routes.
+- Production: `https://casper-crm.vercel.app`, Node 22, Next.js, one Neon database. Two live
+  signups received distinct tenants; an org-A record was invisible to org B and produced both
+  audit and timeline projections. Health returned ready and a production outbox workflow run
+  completed successfully.
+
 ## Not yet built (next increments)
 
-auth OAuth login/session (single dev principal meanwhile); casper-ai P1c (WDK durability, real
-plan + clarify states, budget enforcement, `@casper/ai` test suite — see deviations above);
-feedback widget wiring (still mock); the `casper-records` Filter-AST playground + `casper-auth`
-`can()` playground (D-025) and the `tooling/playground` host/kit; CSV export (P1);
-config-snapshot persistence to `record_types`/`field_defs`.
-Relations cascade-on-archive is stubbed (edges maintained, enforcement deferred).
+GitHub OAuth provider credentials; casper-ai P1c (budgets, tests, real plan/clarify states);
+feedback widget wiring; CSV export/import and dedupe; config-snapshot persistence to
+`record_types`/`field_defs`. Relations cascade-on-archive remains deferred.

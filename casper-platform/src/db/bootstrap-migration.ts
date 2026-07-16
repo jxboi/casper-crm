@@ -24,6 +24,11 @@ export const platformMigrations: Migration[] = [
         END IF;
       END
       $$;
+      -- SET ROLE requires membership for non-superusers. Neon's login user
+      -- (neondb_owner) is not superuser, so without this grant withTx's
+      -- SET LOCAL ROLE fails with 42501; under PGlite the connecting user is
+      -- superuser and the grant is a harmless no-op.
+      GRANT casper_app TO CURRENT_USER;
       GRANT USAGE ON SCHEMA public TO casper_app;
       GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO casper_app;
       GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO casper_app;

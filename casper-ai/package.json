@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --root .. casper-ai/src --passWithNoTests"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.1",

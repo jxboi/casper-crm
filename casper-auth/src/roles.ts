@@ -46,6 +46,9 @@ const MEMBER_GRANTS: Grant[] = [
   { action: "record.archive", scope: "own" },
   { action: "record.transition", scope: "own" },
   { action: "record.field.write:*", scope: "own" },
+  { action: "comment.*", scope: "workspace" },
+  { action: "view.create", scope: "workspace" },
+  { action: "notification.read", scope: "own" },
 ];
 
 // Managers edit across their team(s) and can approve change sets.
@@ -64,6 +67,9 @@ const WORKSPACE_ADMIN_GRANTS: Grant[] = [
   { action: "workflow.publish", scope: "workspace" },
   { action: "member.*", scope: "workspace" },
   { action: "team.manage", scope: "workspace" },
+  { action: "comment.*", scope: "workspace" },
+  { action: "view.create", scope: "workspace" },
+  { action: "notification.read", scope: "own" },
 ];
 
 const ORG_ADMIN_GRANTS: Grant[] = [
@@ -73,6 +79,9 @@ const ORG_ADMIN_GRANTS: Grant[] = [
   { action: "member.*", scope: "org" },
   { action: "workspace.create", scope: "org" },
   { action: "team.manage", scope: "org" },
+  { action: "comment.*", scope: "org" },
+  { action: "view.create", scope: "org" },
+  { action: "notification.read", scope: "own" },
 ];
 
 const ORG_OWNER_GRANTS: Grant[] = [{ action: "*", scope: "org" }];

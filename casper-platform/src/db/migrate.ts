@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { PGlite } from "@electric-sql/pglite";
 import type { Db } from "./client.js";
 import { logger } from "../logger.js";
 import { platformMigrations } from "./bootstrap-migration.js";
@@ -58,10 +59,17 @@ export async function runMigrations(db: Db): Promise<void> {
   for (const m of pending) {
     const key = `${m.module}:${m.version}`;
     if (done.has(key)) continue;
-    // PGlite rejects multi-statement scripts through the prepared-statement path,
-    // so DDL runs via the raw client's `exec()` (which handles statement batches),
-    // wrapped in an explicit transaction for atomicity.
-    await db.$client.exec(`BEGIN;\n${m.sql}\nCOMMIT;`);
+    // Multi-statement DDL can't ride the prepared-statement path on either driver,
+    // so scripts run through each client's simple-query facility — PGlite's `exec()`
+    // batch API, or an unparameterized `query()` on the Neon pool (node-postgres
+    // uses the multi-statement simple protocol when no params are bound) — wrapped
+    // in an explicit transaction for atomicity.
+    const script = `BEGIN;\n${m.sql}\nCOMMIT;`;
+    if (db.$client instanceof PGlite) {
+      await db.$client.exec(script);
+    } else {
+      await db.$client.query(script);
+    }
     await db.execute(
       sql`INSERT INTO _migrations (module, version, name) VALUES (${m.module}, ${m.version}, ${m.name})`,
     );

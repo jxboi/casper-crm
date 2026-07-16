@@ -1,5 +1,6 @@
 import { and, eq, or } from "drizzle-orm";
 import { AppError, newId, requestContext, withTx } from "@casper/platform";
+import { assertCan } from "@casper/auth";
 import { savedViews } from "./schema.js";
 import { getRecordType } from "./registry.js";
 import { listRecords, type ListRecordsResult, type Sort } from "./query.js";
@@ -40,6 +41,12 @@ export interface CreateViewInput {
 export async function createSavedView(input: CreateViewInput): Promise<SavedViewModel> {
   const ctx = requestContext.require();
   getRecordType(input.recordType);
+  await assertCan(
+    ctx.principal,
+    "view.create",
+    { kind: "record", type: input.recordType, workspaceId: ctx.workspaceId },
+    { workspaceId: ctx.workspaceId },
+  );
   const scope = input.scope ?? "personal";
   const id = newId();
   await withTx((tx) =>

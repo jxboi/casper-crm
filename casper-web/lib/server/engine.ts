@@ -1,25 +1,13 @@
+import { requestContext, type Db, type Principal } from "@casper/platform";
+import { initializeRuntime, registerRuntimeModules } from "@casper/api";
 import {
-  registerMigrations,
-  createPgliteDb,
-  setDb,
-  runMigrations,
-  requestContext,
-  type Db,
-  type Principal,
-} from "@casper/platform";
-import {
-  authMigrations,
   createOrg,
   createWorkspace,
   createUser,
   addMembership,
-} from "@casper/auth";
-import { eventsMigrations } from "@casper/events";
-import { registerRecordsModule } from "@casper/records";
-import { registerWorkflowModule } from "@casper/workflow";
-import { registerChangesetsModule } from "@casper/changesets";
-import { registerAiModule } from "@casper/ai";
-import { registerSalesModule, seedSalesData } from "@casper/sales";
+} from "@casper/auth/testkit";
+import { resolvePrincipal } from "@casper/auth";
+import { seedSalesData } from "@casper/sales";
 
 /**
  * Server-only engine bootstrap for the dev/dogfood web app.
@@ -51,28 +39,26 @@ export interface EngineHandle {
   userName: string;
 }
 
-interface Provisioned extends EngineHandle {
+interface Runtime {
   db: Db;
 }
 
 /** Populate this module graph's registries. Idempotent — safe to call per request. */
 function registerAll(): void {
-  registerMigrations(authMigrations);
-  registerMigrations(eventsMigrations);
-  registerRecordsModule();
-  registerWorkflowModule();
-  registerChangesetsModule();
-  registerAiModule();
-  registerSalesModule();
+  registerRuntimeModules();
 }
 
-/** Create the database, migrate, and seed — exactly once for the process. */
-async function provision(): Promise<Provisioned> {
+/** Create the configured database and apply every module migration once. */
+async function provisionRuntime(): Promise<Runtime> {
   registerAll();
+  const db = await initializeRuntime();
 
-  const db = createPgliteDb();
-  setDb(db);
-  await runMigrations(db);
+  return { db };
+}
+
+/** Local-only demo tenant. Production requests always resolve a real session user. */
+async function provisionDemoPrincipal(): Promise<EngineHandle> {
+  await initializeEngine();
 
   const org = await createOrg("Casper (dev)");
   const ws = await createWorkspace(org.id, "Sales");
@@ -82,24 +68,36 @@ async function provision(): Promise<Provisioned> {
   const principal: Principal = { kind: "user", id: user.id, orgId: org.id, workspaceId: ws.id };
   await requestContext.run({ principal }, () => seedSalesData({ variant: "demo" }));
 
-  return { db, principal, orgId: org.id, workspaceId: ws.id, userName: "Amara Devi" };
+  return { principal, orgId: org.id, workspaceId: ws.id, userName: "Amara Devi" };
 }
 
 const globalForEngine = globalThis as unknown as {
-  __casperProvision?: Promise<Provisioned>;
+  __casperRuntime?: Promise<Runtime>;
+  __casperDemoPrincipal?: Promise<EngineHandle>;
 };
+
+export async function initializeEngine(): Promise<Db> {
+  globalForEngine.__casperRuntime ??= provisionRuntime();
+  const runtime = await globalForEngine.__casperRuntime;
+  registerAll();
+  await initializeRuntime();
+  return runtime.db;
+}
 
 /**
  * Boot the engine (once per process) and ensure the calling module graph's registries
  * are wired to the one shared database. Returns the dev tenant handle.
  */
-export async function getEngine(): Promise<EngineHandle> {
-  globalForEngine.__casperProvision ??= provision();
-  const p = await globalForEngine.__casperProvision;
-  // This graph may be a different webpack bundle than the one that provisioned: make
-  // sure its in-memory registries are populated and its db handle points at the shared
-  // PGlite instance. Both operations are idempotent.
-  registerAll();
-  setDb(p.db);
-  return { principal: p.principal, orgId: p.orgId, workspaceId: p.workspaceId, userName: p.userName };
+export async function getEngine(
+  userId?: string,
+  preferredWorkspaceId?: string,
+): Promise<EngineHandle> {
+  await initializeEngine();
+  if (userId) return resolvePrincipal(userId, preferredWorkspaceId);
+
+  if (process.env.NODE_ENV === "production" || process.env.DATABASE_URL) {
+    throw new Error("An authenticated user is required");
+  }
+  globalForEngine.__casperDemoPrincipal ??= provisionDemoPrincipal();
+  return globalForEngine.__casperDemoPrincipal;
 }

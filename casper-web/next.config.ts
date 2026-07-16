@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: fileURLToPath(new URL("..", import.meta.url)),
   // Pin Turbopack's root to the monorepo root (one level up) so it can compile the
   // workspace `@casper/*` sources and resolve the pnpm-hoisted `next` package, both of
   // which live outside this directory.
@@ -34,4 +36,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

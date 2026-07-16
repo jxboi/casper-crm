@@ -8,3 +8,6 @@ packages:
   - casper-ai
   - casper-sales
   - casper-web
+  - casper-api
+  - tooling/playground-kit
+  - tooling/playground

@@ -1,4 +1,6 @@
 import { requestContext } from "@casper/platform";
+import { headers } from "next/headers";
+import { getAuth } from "./auth.js";
 import { getEngine, type EngineHandle } from "./engine.js";
 
 /**
@@ -13,6 +15,12 @@ import { getEngine, type EngineHandle } from "./engine.js";
 export async function withEngine<T>(
   fn: (engine: EngineHandle) => Promise<T>,
 ): Promise<T> {
-  const engine = await getEngine();
+  let userId: string | undefined;
+  if (process.env.DATABASE_URL) {
+    const session = await getAuth().api.getSession({ headers: await headers() });
+    userId = session?.user.id;
+    if (!userId) throw new Error("Unauthenticated");
+  }
+  const engine = await getEngine(userId);
   return requestContext.run({ principal: engine.principal }, () => fn(engine));
 }

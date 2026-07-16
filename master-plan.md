@@ -1,6 +1,6 @@
 # Casper CRM — Master Plan
 
-**Version:** 0.8 &nbsp;|&nbsp; **Date:** 2026-07-15 &nbsp;|&nbsp; **Stage:** Building — Phase 0 foundations + Phase 1 engine (records, workflow, changesets) built; **casper-sales P1a** (product config) built; **casper-web** wired to the engine (Pipeline/detail/lists + approvals, D-018); **casper-ai P1b run engine** built (M1 7-tool loop, Sales Follow-up Assistant, SSE to the dock) — in-process for the dogfood slice, WDK durability + budgets enforcement + tests outstanding
+**Version:** 0.9 &nbsp;|&nbsp; **Date:** 2026-07-16 &nbsp;|&nbsp; **Stage:** **Phase 0 complete**; Phase 1 engine (records, workflow, changesets), casper-sales P1a, casper-web dogfood UI, and casper-ai P1b run engine are built. Next frontier: Phase 1 durability/budgets and dogfood hardening.
 
 > Source references: [adaptive-crm-workflow-platform-summary.md](adaptive-crm-workflow-platform-summary.md), [ai-strategy.md](ai-strategy.md).
 > Those documents are the vision input. **This file is the source of truth for cross-module decisions.** Each module folder contains a `plan.md` that must stay aligned with this file (see §10 Alignment Protocol).
@@ -216,6 +216,8 @@ Phases match the AI-strategy rollout. A phase is done when its **exit criteria**
 Modules: platform, auth, events, records (core), web (shell), api (runtime skeleton).
 Build: monorepo scaffold; multi-tenant auth (sign-up, org/workspace, invites, roles); record engine with system Task type + one placeholder product type; event outbox + audit log + timeline; deployed to real infra with CI; playground host + kit with the initial `can()` (auth) and Filter-AST (records) surfaces (D-025).
 **Exit criteria:** two orgs can sign up and cannot see each other's data (verified by automated cross-tenant tests); creating/updating a record produces an audit entry and timeline item; deployed web + api + db with CI; `can()` gate used by every write path.
+
+**Phase 0 closure — verified 2026-07-16.** Two production Better Auth signups created distinct org/workspace memberships in Neon; a live record written as org A was invisible as org B and produced both `task.created` audit and timeline projections. The single Vercel deployment exposes web, auth/API, health, and WDK endpoints; the daily Hobby-compatible cron starts a durable 24-hour loop with one-minute outbox sweeps, and a production workflow run completed successfully. CI runs frozen install → typecheck → tests → build; the closure suite is 63 tests across 12 typechecked packages. Public Phase 0 mutators are context-bound and `assertCan()`-gated; seed/provisioning bypasses are isolated to `@casper/auth/testkit`. The dev-only playground host boots the auth `can()` explorer and records Filter-AST builder via `pnpm play <module>` and is excluded from deployment.
 
 ### Phase 1 — Sales CRM + narrow assistant MVP (dogfood, D-017)
 Modules: sales, workflow (v1), changesets (v1), ai (v1), comms (drafts only), feedback (capture only), web (CRM UI + AI surfaces + approvals). Split into three sequenced milestones — CRM fundamentals first, then the assistant:

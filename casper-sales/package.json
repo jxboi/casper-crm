@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --root .. casper-sales/src"
   },
   "dependencies": {
     "@casper/ai": "workspace:^",
