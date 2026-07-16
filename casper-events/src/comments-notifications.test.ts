@@ -16,7 +16,7 @@ import {
   createUser,
   createWorkspace,
   addMembership,
-} from "@casper/auth";
+} from "@casper/auth/testkit";
 import {
   eventsMigrations,
   addComment,

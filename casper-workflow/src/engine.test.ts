@@ -17,7 +17,7 @@ import {
   createTeam,
   addToTeam,
   addMembership,
-} from "@casper/auth";
+} from "@casper/auth/testkit";
 import { eventsMigrations, getAuditLog, getTimeline } from "@casper/events";
 import {
   registerRecordsModule,

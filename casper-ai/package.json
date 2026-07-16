@@ -1,0 +1,29 @@
+{
+  "name": "@casper/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --root .. casper-ai/src --passWithNoTests"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.1",
+    "@casper/auth": "workspace:*",
+    "@casper/changesets": "workspace:*",
+    "@casper/events": "workspace:*",
+    "@casper/platform": "workspace:*",
+    "@casper/records": "workspace:*",
+    "@casper/workflow": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -94,7 +94,10 @@ export type ChangeSet = {
   intent: string;
   authorName: string;
   origin: "ai_run" | "manual";
-  status: "in_review" | "committed";
+  /** Mapped from the engine's richer status set: draft/in_review → in_review;
+   *  approved (all decided, some approved) → approved; committing/committed →
+   *  committed; rejected/rolled_back → rejected. See toWebChangeSet. */
+  status: "in_review" | "approved" | "committed" | "rejected";
   createdAt: string;
   changes: Change[];
 };

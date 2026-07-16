@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   text,
+  boolean,
   timestamp,
   primaryKey,
   unique,
@@ -24,7 +25,12 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  orgName: text("org_name"),
+  workspaceName: text("workspace_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const workspaces = pgTable("workspaces", {

@@ -26,6 +26,7 @@ export {
   rejectChange,
   approveAll,
   getChangeSet,
+  listChangeSets,
 } from "./changeset.js";
 export { commitChangeSet } from "./commit.js";
 

@@ -9,6 +9,7 @@ import {
   type Tx,
 } from "@casper/platform";
 import { schema as authSchema } from "@casper/auth";
+import { assertCan } from "@casper/auth";
 import { comments } from "./schema.js";
 import { emit } from "./emit.js";
 import { dispatchPending } from "./dispatch.js";
@@ -100,6 +101,12 @@ export async function addComment(input: AddCommentInput): Promise<CommentModel> 
   const ctx = requestContext.require();
   const workspaceId = ctx.workspaceId ?? ctx.principal.workspaceId;
   if (!workspaceId) throw AppError.invalidState("comments require a workspace in context");
+  await assertCan(
+    ctx.principal,
+    "comment.create",
+    { kind: "record", type: input.record.type, id: input.record.id, workspaceId },
+    { workspaceId },
+  );
   const body = input.body.trim();
   if (!body) throw AppError.validation("comment body is empty");
 
@@ -143,6 +150,7 @@ export interface EditCommentInput {
 
 export async function editComment(input: EditCommentInput): Promise<CommentModel> {
   const ctx = requestContext.require();
+  await assertCan(ctx.principal, "comment.edit", { kind: "global" }, { workspaceId: ctx.workspaceId });
   const body = input.body.trim();
   if (!body) throw AppError.validation("comment body is empty");
 
@@ -176,6 +184,7 @@ export async function editComment(input: EditCommentInput): Promise<CommentModel
 
 export async function deleteComment(id: string): Promise<void> {
   const ctx = requestContext.require();
+  await assertCan(ctx.principal, "comment.delete", { kind: "global" }, { workspaceId: ctx.workspaceId });
   await withTx(async (tx) => {
     const existing = await loadComment(tx, id);
     if (existing.authorId !== ctx.principal.id) {

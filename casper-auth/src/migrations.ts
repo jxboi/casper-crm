@@ -94,4 +94,58 @@ export const authMigrations: Migration[] = [
         );
     `,
   },
+  {
+    module: "auth",
+    version: 2,
+    name: "better_auth",
+    sql: `
+      ALTER TABLE users ADD COLUMN email_verified boolean NOT NULL DEFAULT false;
+      ALTER TABLE users ADD COLUMN image text;
+      ALTER TABLE users ADD COLUMN org_name text;
+      ALTER TABLE users ADD COLUMN workspace_name text;
+      ALTER TABLE users ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now();
+
+      CREATE TABLE auth_sessions (
+        id uuid PRIMARY KEY,
+        expires_at timestamptz NOT NULL,
+        token text NOT NULL UNIQUE,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        ip_address text,
+        user_agent text,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX auth_sessions_user_idx ON auth_sessions (user_id);
+
+      CREATE TABLE auth_accounts (
+        id uuid PRIMARY KEY,
+        account_id text NOT NULL,
+        provider_id text NOT NULL,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        access_token text,
+        refresh_token text,
+        id_token text,
+        access_token_expires_at timestamptz,
+        refresh_token_expires_at timestamptz,
+        scope text,
+        password text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (provider_id, account_id)
+      );
+      CREATE INDEX auth_accounts_user_idx ON auth_accounts (user_id);
+
+      CREATE TABLE auth_verifications (
+        id uuid PRIMARY KEY,
+        identifier text NOT NULL,
+        value text NOT NULL,
+        expires_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+      CREATE INDEX auth_verifications_identifier_idx ON auth_verifications (identifier);
+
+      GRANT SELECT, INSERT, UPDATE, DELETE ON auth_sessions, auth_accounts, auth_verifications TO casper_app;
+    `,
+  },
 ];

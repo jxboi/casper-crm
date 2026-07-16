@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./playground": "./src/playground.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --root .. casper-records/src"
   },
   "dependencies": {
     "@casper/auth": "workspace:*",
@@ -18,6 +19,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@casper/playground-kit": "workspace:*",
+    "@types/react": "^19.0.6",
+    "react": "^19.0.0",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
   }

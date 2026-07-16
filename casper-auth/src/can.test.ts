@@ -9,7 +9,7 @@ import {
   createTeam,
   addToTeam,
   addMembership,
-} from "./service.js";
+} from "./testkit.js";
 import { can } from "./can.js";
 
 /**

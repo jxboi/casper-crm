@@ -42,3 +42,5 @@ pgdata/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.vercel
+.env*

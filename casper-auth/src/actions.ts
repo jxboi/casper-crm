@@ -19,10 +19,16 @@ export type AdminAction =
   | "team.manage";
 
 export type EngineAction = "changeset.approve" | "workflow.publish";
+export type CollaborationAction =
+  | "comment.create"
+  | "comment.edit"
+  | "comment.delete"
+  | "view.create"
+  | "notification.read";
 
 export type FieldWriteAction = `record.field.write:${string}`;
 
-export type Action = RecordAction | AdminAction | EngineAction | FieldWriteAction | "*";
+export type Action = RecordAction | AdminAction | EngineAction | CollaborationAction | FieldWriteAction | "*";
 
 const FIELD_WRITE_PREFIX = "record.field.write:";
 

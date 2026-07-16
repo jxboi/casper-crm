@@ -13,7 +13,7 @@ import {
   createUser,
   createWorkspace,
   addMembership,
-} from "@casper/auth";
+} from "@casper/auth/testkit";
 import { eventsMigrations, getAuditLog } from "@casper/events";
 import {
   registerRecordsModule,

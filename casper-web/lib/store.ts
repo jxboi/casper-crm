@@ -2,12 +2,22 @@
 
 import { create } from "zustand";
 import type {
-  AIMessage, Change, ChangeSet, Company, Contact, Deal, EmailDraft,
+  AIMessage, ChangeSet, Company, Contact, Deal, EmailDraft,
   FeedbackContext, FeedbackItem, FeedbackScreenshot, FeedbackStatus, FeedbackTarget,
   PlanStep, RunStatus, StageKey, Task, TimelineEvent, User,
 } from "@/lib/types";
 import { guardIssues, neglectReasons, stageOf } from "@/lib/pipeline";
 import { COMPANIES, CONTACTS, DEALS, TASKS, TIMELINE, USERS } from "@/lib/seed";
+import { loadNeglectedDeals, type NeglectedDeal } from "@/lib/server/actions";
+import {
+  approveAllAction,
+  approveChangeAction,
+  commitChangeSetAction,
+  countPendingApprovals,
+  getWebChangeSet,
+  rejectAllAction,
+  rejectChangeAction,
+} from "@/lib/server/changesets";
 
 const TODAY = "2026-07-12";
 
@@ -27,10 +37,11 @@ type Store = {
   deals: Deal[];
   tasks: Task[];
   timeline: TimelineEvent[];
-  changeSets: ChangeSet[];
   drafts: EmailDraft[];
   feedback: FeedbackItem[];
   toasts: Toast[];
+  /** In-review/approved change-set count for the nav badge (engine-backed). */
+  pendingApprovals: number;
 
   dockOpen: boolean;
   dockTab: DockTab;
@@ -39,7 +50,13 @@ type Store = {
     messages: AIMessage[];
     steps: PlanStep[];
     changeSetId: string | null;
+    /** The run's live change set, fetched from the engine (source of truth). */
+    changeSet: ChangeSet | null;
+    /** Real neglected deals loaded from the engine when the run starts. */
+    neglected: NeglectedDeal[];
   };
+  /** Change-set id currently being committed to the engine (guards double-commit). */
+  committing: string | null;
 
   setUser: (id: string) => void;
   toggleDock: (open?: boolean) => void;
@@ -64,9 +81,14 @@ type Store = {
 
   startRun: () => void;
   answerClarify: (choice: string) => void;
-  setChangeApproval: (changeSetId: string, changeId: string, approval: Change["approval"]) => void;
-  setAllApprovals: (changeSetId: string, approval: Change["approval"]) => void;
-  commitChangeSet: (changeSetId: string) => void;
+  /** Approve/reject a single change of the run's change set (engine-backed). */
+  reviewRunChange: (changeId: string, decision: "approved" | "rejected") => Promise<void>;
+  /** Approve/reject every pending change of the run's change set. */
+  reviewAllRun: (decision: "approved" | "rejected") => Promise<void>;
+  /** Commit the run's approved changes through the engine. */
+  commitRunChangeSet: () => Promise<void>;
+  /** Refresh the nav's pending-approvals badge from the engine. */
+  refreshApprovalsCount: () => Promise<void>;
 };
 
 export const useStore = create<Store>()((set, get) => {
@@ -87,14 +109,15 @@ export const useStore = create<Store>()((set, get) => {
     deals: DEALS,
     tasks: TASKS,
     timeline: TIMELINE,
-    changeSets: [],
     drafts: [],
     feedback: [],
     toasts: [],
+    pendingApprovals: 0,
 
     dockOpen: false,
     dockTab: "conversation",
-    run: { status: "idle", messages: [], steps: [], changeSetId: null },
+    run: { status: "idle", messages: [], steps: [], changeSetId: null, changeSet: null, neglected: [] },
+    committing: null,
 
     setUser: (id) => set({ currentUserId: id }),
     toggleDock: (open) => set((s) => ({ dockOpen: open ?? !s.dockOpen })),
@@ -246,11 +269,14 @@ export const useStore = create<Store>()((set, get) => {
     },
 
     /* ------------------------------------------------------------------
-       Scripted assistant run — the M1 "first follow-up" demo slice.
-       In the real product this is a Workflow DevKit run in casper-api
-       streaming over SSE; here it is deterministic client-side theatre.
-       The safety property it demonstrates is real, though: the run only
-       ever produces a draft change set — commit is a human action.
+       Assistant run — the M1 "first follow-up" slice. The conversation /
+       plan pacing is still client-side theatre (the real product runs this
+       as a Workflow DevKit run in casper-api streaming over SSE — D-019),
+       but the *data* is real now: the run reads neglected deals from the
+       engine and its committed changes are written through the engine's
+       single write path (see `commitChangeSet`). The safety property is
+       genuine: the run only ever produces a draft change set — commit is a
+       human action, and until then nothing has touched a record.
        ------------------------------------------------------------------ */
     startRun: () => {
       const s = get();
@@ -261,197 +287,233 @@ export const useStore = create<Store>()((set, get) => {
       set({
         dockOpen: true,
         dockTab: "conversation",
-        run: { status: "clarifying", messages: [], steps: [], changeSetId: null },
+        run: { status: "clarifying", messages: [], steps: [], changeSetId: null, changeSet: null, neglected: [] },
       });
       pushMessage({ role: "user", text: "Prepare follow-ups for my neglected deals." });
-      setTimeout(() => {
-        const st = get();
-        const mine = st.deals.filter((d) => d.ownerId === st.currentUserId && neglectReasons(d).length > 0);
-        const lines = mine
-          .map((d) => `• ${d.name} — ${neglectReasons(d).join("; ")}`)
+
+      void (async () => {
+        let neglected: NeglectedDeal[];
+        try {
+          neglected = await loadNeglectedDeals();
+        } catch {
+          pushMessage({
+            role: "assistant",
+            text: "I couldn't reach the pipeline just now — give it a moment and try again.",
+          });
+          set((st) => ({ run: { ...st.run, status: "idle" } }));
+          return;
+        }
+
+        if (neglected.length === 0) {
+          pushMessage({
+            role: "assistant",
+            text: "Good news — none of your open deals are showing neglect signals right now, so there's nothing to prepare.",
+          });
+          set((st) => ({ run: { ...st.run, status: "committed" } }));
+          return;
+        }
+
+        const lines = neglected
+          .map((n) => `• ${n.deal.name} — ${neglectReasons(n.deal).join("; ")}`)
           .join("\n");
+        set((st) => ({ run: { ...st.run, neglected } }));
         pushMessage({
           role: "assistant",
-          text: `I checked record.neglected signals on your pipeline and found ${mine.length} deals:\n${lines}\n\nShould I prepare follow-ups for all of them, or only what closes this month?`,
+          text: `I checked record.neglected signals on your pipeline and found ${neglected.length} deal${neglected.length === 1 ? "" : "s"}:\n${lines}\n\nShould I prepare follow-ups for all of them, or only what closes this month?`,
           chips: ["All of them", "Only closing this month"],
         });
-      }, 800);
+      })();
     },
 
     answerClarify: (choice) => {
       pushMessage({ role: "user", text: choice });
       const onlyThisMonth = choice.toLowerCase().includes("month");
-      set((s) => ({ run: { ...s.run, status: "planning" } }));
+      set((s) => ({ run: { ...s.run, status: "planning", steps: [] } }));
 
-      const steps: PlanStep[] = [
-        { id: "s1", label: "Find neglected deals", detail: "record.neglected events + saved-view filter", status: "pending" },
-        { id: "s2", label: "Review each timeline", detail: "last touch, open tasks, thread context", status: "pending" },
-        { id: "s3", label: "Draft follow-up actions", detail: "tasks, next-action dates, email drafts", status: "pending" },
-        { id: "s4", label: "Assemble change set", detail: "everything lands as drafts for your approval", status: "pending" },
-      ];
-      steps.forEach((step, i) => {
-        setTimeout(() => {
-          set((s) => ({ run: { ...s.run, steps: [...s.run.steps, step] } }));
-        }, 350 * (i + 1));
-      });
-      setTimeout(() => {
-        pushMessage({ role: "assistant", text: "Plan is up — working through it now. Follow along in the Plan tab." });
-        set((s) => ({ run: { ...s.run, status: "working" } }));
-      }, 350 * steps.length + 400);
+      // The clarify choice shapes the request; the real casper-ai run decides the rest.
+      const request = onlyThisMonth
+        ? "Prepare follow-ups for my neglected deals, but only the ones closing this month."
+        : "Prepare follow-ups for all of my neglected deals.";
 
-      const markStep = (idx: number, status: PlanStep["status"]) =>
-        set((s) => ({
-          run: { ...s.run, steps: s.run.steps.map((st, i) => (i === idx ? { ...st, status } : st)) },
-        }));
-      const base = 350 * steps.length + 700;
-      steps.forEach((_, i) => {
-        setTimeout(() => {
-          markStep(i, "active");
-          if (i > 0) markStep(i - 1, "done");
-        }, base + i * 650);
-      });
+      const mapStatus = (s: string): RunStatus =>
+        s === "planning" ? "planning" : s === "preview_ready" ? "review" : s === "failed" ? "idle" : "working";
 
-      setTimeout(() => {
-        markStep(steps.length - 1, "done");
-        const st = get();
-        let targets = st.deals.filter((d) => d.ownerId === st.currentUserId && neglectReasons(d).length > 0);
-        if (onlyThisMonth) {
-          targets = targets.filter((d) => d.expectedCloseDate?.startsWith("2026-07"));
+      // Project a streamed RunEvent onto the dock's state. The audit record lives in the
+      // engine (ai_run_steps); this is just the live view the four surfaces render.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const onEvent = (e: any) => {
+        switch (e.type) {
+          case "run_started":
+            set((s) => ({ run: { ...s.run, changeSetId: null, changeSet: null } }));
+            break;
+          case "plan_ready":
+            set((s) => ({ run: { ...s.run, status: "working", steps: e.plan.steps as PlanStep[] } }));
+            break;
+          case "plan_step":
+            set((s) => ({
+              run: { ...s.run, steps: s.run.steps.map((st) => (st.id === e.stepId ? { ...st, status: e.status } : st)) },
+            }));
+            break;
+          case "message":
+            pushMessage({ role: "assistant", text: e.text });
+            break;
+          case "artifact":
+            if (e.artifact?.kind === "email_draft") {
+              set((s) => ({
+                drafts: [
+                  ...s.drafts,
+                  { id: uid("dr"), dealId: e.artifact.dealId, to: e.artifact.to ?? "", subject: e.artifact.subject, body: e.artifact.body },
+                ],
+              }));
+            }
+            break;
+          case "status":
+            set((s) => ({ run: { ...s.run, status: mapStatus(e.status) } }));
+            break;
+          case "preview_ready":
+            set((s) => ({ run: { ...s.run, status: "review", changeSetId: e.changesetId } }));
+            void (async () => {
+              const cs = await getWebChangeSet(e.changesetId);
+              if (cs) set((s) => ({ run: { ...s.run, changeSet: cs } }));
+              pushMessage({
+                role: "assistant",
+                text: `Ready for review: ${e.changeCount} proposed change${e.changeCount === 1 ? "" : "s"}.\n\nNothing has touched a record — this is a real, staged change set in the engine. Approve what you want in Changes (or the Approvals inbox) and commit; anything you reject stays unapplied.`,
+              });
+              get().toast("ok", `Change set ready: ${e.changeCount} proposal${e.changeCount === 1 ? "" : "s"} awaiting review`);
+              void get().refreshApprovalsCount();
+            })();
+            break;
+          case "error":
+            pushMessage({ role: "assistant", text: `I hit a problem running that: ${e.message}` });
+            set((s) => ({ run: { ...s.run, status: "idle" } }));
+            get().toast("err", "The assistant run failed — nothing was staged.");
+            break;
         }
+      };
 
-        const followUps: Record<string, { task: string; due: string; nextAction: string; draft?: Omit<EmailDraft, "id" | "dealId"> }> = {
-          d_northwind: {
-            task: "Call Daniel Ng — renewal decision after board meeting",
-            due: "2026-07-14",
-            nextAction: "2026-07-14",
-            draft: {
-              to: "daniel.ng@northwind.asia",
-              subject: "Northwind renewal — picking up after your board meeting",
-              body: "Hi Daniel,\n\nYou mentioned the board was meeting end of June — I wanted to pick this back up so the renewal doesn’t lapse on the 30 July date we discussed.\n\nWould a 20-minute call this week work to close out the two open commercial points?\n\nBest,\nAmara",
-            },
-          },
-          d_meridian: {
-            task: "Follow up on v2 proposal with Sarah",
-            due: "2026-07-15",
-            nextAction: "2026-07-15",
-            draft: {
-              to: "sarah@meridian.com.sg",
-              subject: "Revised scope — anything else you need from us?",
-              body: "Hi Sarah,\n\nJust checking in on the revised proposal I sent on 6 July — happy to walk your partners through the scoping changes if that helps.\n\nIs there anything blocking a decision on your side?\n\nBest,\nAmara",
-            },
-          },
-          d_helios: {
-            task: "Book pricing review call with Marcus (CFO)",
-            due: "2026-07-16",
-            nextAction: "2026-07-16",
-          },
-        };
-
-        const changes: Change[] = [];
-        const drafts: EmailDraft[] = [];
-        for (const deal of targets) {
-          const fu = followUps[deal.id];
-          if (!fu) continue;
-          changes.push({
-            id: uid("ch"), op: "create_task", dealId: deal.id, dealName: deal.name,
-            summary: `Task: “${fu.task}” · due ${fu.due}`,
-            risk: "medium", approval: "pending",
-            payload: { taskTitle: fu.task, dueDate: fu.due },
+      void (async () => {
+        let res: Response;
+        try {
+          res = await fetch("/api/ai/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assistantKey: "sales-followup", request }),
           });
-          changes.push({
-            id: uid("ch"), op: "update_field", dealId: deal.id, dealName: deal.name,
-            summary: "next action date",
-            before: deal.nextActionDate ?? "—", after: fu.nextAction,
-            risk: "medium", approval: "pending",
-            payload: { fieldKey: "nextActionDate", value: fu.nextAction },
-          });
-          if (fu.draft) {
-            const draft: EmailDraft = { id: uid("dr"), dealId: deal.id, ...fu.draft };
-            drafts.push(draft);
-            changes.push({
-              id: uid("ch"), op: "email_draft", dealId: deal.id, dealName: deal.name,
-              summary: `Email draft to ${fu.draft.to} — “${fu.draft.subject}”`,
-              risk: "low", approval: "pending",
-              payload: { artifactId: draft.id },
-            });
+        } catch {
+          onEvent({ type: "error", message: "couldn't reach the run engine" });
+          return;
+        }
+        if (!res.ok || !res.body) {
+          onEvent({ type: "error", message: `run endpoint returned ${res.status}` });
+          return;
+        }
+        // Parse the SSE stream frame by frame (data: <json>\n\n).
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = buf.indexOf("\n\n")) >= 0) {
+            const frame = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            if (!frame.startsWith("data:")) continue;
+            const line = frame.slice(5).trim();
+            if (!line) continue;
+            let e: unknown;
+            try {
+              e = JSON.parse(line);
+            } catch {
+              continue;
+            }
+            if ((e as { type?: string }).type === "done") continue;
+            onEvent(e);
           }
         }
-
-        const cs: ChangeSet = {
-          id: uid("cs"),
-          title: `Follow-ups for ${targets.length} neglected deal${targets.length === 1 ? "" : "s"}`,
-          intent: "Prepare follow-ups for my neglected deals",
-          authorName: "Sales Assistant",
-          origin: "ai_run",
-          status: "in_review",
-          createdAt: TODAY,
-          changes,
-        };
-        set((s) => ({
-          drafts: [...s.drafts, ...drafts],
-          changeSets: [...s.changeSets, cs],
-          run: { ...s.run, status: "review", changeSetId: cs.id },
-        }));
-        pushMessage({
-          role: "assistant",
-          text: `Ready for review: ${changes.length} proposed changes across ${targets.length} deal${targets.length === 1 ? "" : "s"}${drafts.length ? `, with ${drafts.length} email drafts in the Workspace tab` : ""}.\n\nNothing has touched a record — approve what you want in Changes (or the Approvals inbox) and commit. Anything you reject stays a draft.`,
-        });
-        get().toast("ok", `Change set ready: ${changes.length} proposals awaiting review`);
-      }, base + steps.length * 650 + 500);
+      })();
     },
 
-    setChangeApproval: (changeSetId, changeId, approval) =>
-      set((s) => ({
-        changeSets: s.changeSets.map((cs) =>
-          cs.id === changeSetId
-            ? { ...cs, changes: cs.changes.map((c) => (c.id === changeId ? { ...c, approval } : c)) }
-            : cs
-        ),
-      })),
-
-    setAllApprovals: (changeSetId, approval) =>
-      set((s) => ({
-        changeSets: s.changeSets.map((cs) =>
-          cs.id === changeSetId ? { ...cs, changes: cs.changes.map((c) => ({ ...c, approval })) } : cs
-        ),
-      })),
-
-    commitChangeSet: (changeSetId) => {
-      const s = get();
-      const cs = s.changeSets.find((c) => c.id === changeSetId);
-      if (!cs || cs.status !== "in_review") return;
-      const approved = cs.changes.filter((c) => c.approval === "approved");
-      const rejected = cs.changes.filter((c) => c.approval !== "approved");
-
-      for (const change of approved) {
-        if (change.op === "create_task" && change.payload.taskTitle && change.payload.dueDate) {
-          const deal = s.deals.find((d) => d.id === change.dealId);
-          get().addTask(change.dealId, change.payload.taskTitle, change.payload.dueDate, "ai", deal?.ownerId);
-          pushEvent(change.dealId, "task.created", `${change.payload.taskTitle} (via approved change set)`, "Sales Assistant", "ai");
-        }
-        if (change.op === "update_field" && change.payload.fieldKey && change.payload.value) {
-          get().updateDealField(change.dealId, change.payload.fieldKey, change.payload.value, {
-            actorName: "Sales Assistant",
-            source: "ai",
-          });
-        }
-        if (change.op === "email_draft") {
-          pushEvent(change.dealId, "artifact.saved", change.summary, "Sales Assistant", "ai");
-        }
+    reviewRunChange: async (changeId, decision) => {
+      const csId = get().run.changeSetId;
+      if (!csId) return;
+      try {
+        const changeSet =
+          decision === "approved"
+            ? await approveChangeAction(csId, changeId)
+            : await rejectChangeAction(csId, changeId);
+        set((s) => ({ run: { ...s.run, changeSet } }));
+      } catch {
+        get().toast("err", "Couldn't record that decision — try again.");
       }
+    },
+
+    reviewAllRun: async (decision) => {
+      const csId = get().run.changeSetId;
+      if (!csId) return;
+      try {
+        const changeSet =
+          decision === "approved" ? await approveAllAction(csId) : await rejectAllAction(csId);
+        set((s) => ({ run: { ...s.run, changeSet } }));
+      } catch {
+        get().toast("err", "Couldn't update the change set — try again.");
+      }
+    },
+
+    /* ------------------------------------------------------------------
+       Commit through the real casper-changesets engine (D-006). The approved
+       subset is applied via the records write path under the system principal,
+       every event stamped causationId = changeset — so the deal timelines +
+       audit trail attribute the writes to this run. A stale base version (a
+       concurrent edit) comes back as an issue for re-review, never a clobber.
+       ------------------------------------------------------------------ */
+    commitRunChangeSet: async () => {
+      const s = get();
+      const csId = s.run.changeSetId;
+      if (!csId || s.committing) return;
+
+      set({ committing: csId });
+      let result;
+      try {
+        result = await commitChangeSetAction(csId);
+      } catch {
+        set({ committing: null });
+        get().toast("err", "Commit failed — nothing was written. Try again.");
+        return;
+      }
+      set({ committing: null });
+
       set((st) => ({
-        changeSets: st.changeSets.map((c) => (c.id === changeSetId ? { ...c, status: "committed" } : c)),
-        run: st.run.changeSetId === changeSetId ? { ...st.run, status: "committed" } : st.run,
+        run: {
+          ...st.run,
+          changeSet: result.changeSet,
+          status: result.ok ? "committed" : st.run.status,
+        },
       }));
-      get().toast(
-        "ok",
-        `Committed ${approved.length} change${approved.length === 1 ? "" : "s"}${rejected.length ? ` · ${rejected.length} rejected (stay drafts)` : ""} — fully audited`
-      );
-      if (s.run.changeSetId === changeSetId) {
+
+      const applied = result.changeSet.changes.filter((c) => c.approval === "approved").length;
+      const rejected = result.changeSet.changes.filter((c) => c.approval === "rejected").length;
+      if (result.ok) {
+        get().toast(
+          "ok",
+          `Committed ${applied} change${applied === 1 ? "" : "s"} through the engine${rejected ? ` · ${rejected} rejected` : ""} — fully audited`
+        );
         pushMessage({
           role: "assistant",
-          text: `Committed ${approved.length} of ${cs.changes.length} changes. Timelines and the audit trail are updated — the rejected ones stay as drafts. I’ll nudge you when the next SLA scan flags anything new.`,
+          text: `Committed ${applied} of ${result.changeSet.changes.length} changes through the engine — the deal timelines and audit trail now show them, attributed to this run.${rejected ? ` The ${rejected} you rejected were left unapplied.` : ""} I'll nudge you when the next SLA scan flags anything new.`,
         });
+      } else {
+        get().toast("warn", result.issues[0] ?? "Some changes couldn't be committed — re-review needed");
+      }
+      void get().refreshApprovalsCount();
+    },
+
+    refreshApprovalsCount: async () => {
+      try {
+        set({ pendingApprovals: await countPendingApprovals() });
+      } catch {
+        // Best-effort nav badge; a transient failure just leaves the last count.
       }
     },
   };

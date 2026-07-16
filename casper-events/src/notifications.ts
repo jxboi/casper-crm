@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { newId, now, requestContext, withTx, type Tx } from "@casper/platform";
+import { assertCan } from "@casper/auth";
 import { notifications } from "./schema.js";
 import { on } from "./registry.js";
 import type { DomainEvent } from "./envelope.js";
@@ -145,6 +146,7 @@ export async function listNotifications(
   opts: { unreadOnly?: boolean; limit?: number } = {},
 ): Promise<NotificationModel[]> {
   const ctx = requestContext.require();
+  await assertCan(ctx.principal, "notification.read", { kind: "member", userId: ctx.principal.id, workspaceId: ctx.workspaceId });
   return withTx(async (tx) => {
     const where = opts.unreadOnly
       ? and(eq(notifications.userId, ctx.principal.id), isNull(notifications.readAt))
@@ -176,6 +178,11 @@ export async function unreadCount(): Promise<number> {
 export async function markRead(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   const ctx = requestContext.require();
+  await assertCan(ctx.principal, "notification.read", {
+    kind: "member",
+    userId: ctx.principal.id,
+    workspaceId: ctx.workspaceId,
+  });
   return withTx(async (tx) => {
     const rows = await tx
       .update(notifications)
@@ -194,6 +201,7 @@ export async function markRead(ids: string[]): Promise<number> {
 
 export async function markAllRead(): Promise<number> {
   const ctx = requestContext.require();
+  await assertCan(ctx.principal, "notification.read", { kind: "member", userId: ctx.principal.id, workspaceId: ctx.workspaceId });
   return withTx(async (tx) => {
     const rows = await tx
       .update(notifications)

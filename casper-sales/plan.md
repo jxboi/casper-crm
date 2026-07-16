@@ -1,6 +1,6 @@
 # casper-sales — Plan
 
-**Status:** v0.3 — **P1a built** (types + pipeline + neglect + automations + views + terminology + seed runner; config-only, zero engine changes; 6 tests). Assistant (P1b/1c), dashboards/digest/CSV (P2) not started. | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.5 (D-013, D-014, D-017, D-021, D-025, §2 product-first strategy)
+**Status:** v0.4 — **P1a built** (types + pipeline + neglect + automations + views + terminology + seed runner; config-only, zero engine changes; 6 tests). **P1b: the Sales Follow-up Assistant ships as data** (`src/assistant.ts` — identity, purpose/prompt, M1 tool allowlist, opus tier, policy matrix with `config_publish: never`, budgets; registered via `registerAssistant`, executed by casper-ai; still zero engine changes). Dashboards/digest/CSV (P2) not started. | **Layer:** Product | **Phases:** 1+ | **Depends on:** casper-records, casper-workflow, casper-ai (framework), casper-events | **Used by:** casper-web (product experience), end users | **Aligned with:** master-plan v0.8 (D-013, D-014, D-017, D-021, D-025, §2 product-first strategy)
 
 ## Purpose
 

@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, Columns3, Inbox, MessageSquarePlus, Sparkles, Table2, Users } from "lucide-react";
-import { useCurrentUser, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
+import { authClient } from "@/lib/auth-client";
 import { PIPELINE } from "@/lib/pipeline";
 import { AIDock } from "@/components/ai-dock";
 import { FeedbackWidget } from "@/components/feedback-widget";
@@ -20,15 +22,23 @@ const NAV = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const user = useCurrentUser();
-  const setUser = useStore((s) => s.setUser);
-  const users = useStore((s) => s.users);
+  const { data: session } = authClient.useSession();
   const dockOpen = useStore((s) => s.dockOpen);
   const toggleDock = useStore((s) => s.toggleDock);
-  const pendingApprovals = useStore((s) => s.changeSets.filter((c) => c.status === "in_review").length);
+  const pendingApprovals = useStore((s) => s.pendingApprovals);
+  const refreshApprovalsCount = useStore((s) => s.refreshApprovalsCount);
   const newFeedback = useStore(
     (s) => s.feedback.filter((f) => f.status === "new" && !f.mergedInto).length
   );
+
+  // Seed the approvals badge from the engine once the shell mounts; run/commit flows
+  // keep it fresh thereafter via refreshApprovalsCount.
+  useEffect(() => {
+    if (pathname.startsWith("/sign-")) return;
+    void refreshApprovalsCount();
+  }, [pathname, refreshApprovalsCount]);
+
+  if (pathname.startsWith("/sign-")) return children;
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -44,6 +54,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] ${
                   active ? "bg-accent-soft font-medium text-accent" : "text-muted hover:bg-panel-2 hover:text-ink"
                 }`}
@@ -68,27 +79,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
             pipeline v{PIPELINE.version} · active
           </span>
-          <span className="font-mono text-[10px] text-faint">demo mode — in-memory data</span>
+          <span className="font-mono text-[10px] text-faint">demo mode — local engine data</span>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-13 flex-none items-center gap-3 border-b border-line bg-panel px-4 py-2.5">
           <div className="min-w-0 flex-1" />
-          <label className="flex items-center gap-2 text-[12px] text-muted">
+          <div className="flex items-center gap-2 text-[12px] text-muted">
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">acting as</span>
-            <select
-              value={user.id}
-              onChange={(e) => setUser(e.target.value)}
-              className="rounded-md border border-line bg-panel px-2 py-1.5 text-[12.5px] text-ink"
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} — {u.role}
-                </option>
-              ))}
-            </select>
-          </label>
+            <span className="text-ink">{session?.user.name ?? "workspace member"}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void authClient.signOut().then(() => { window.location.href = "/sign-in"; })}
+            className="rounded-md border border-line px-2.5 py-1.5 text-[12px] text-muted hover:text-ink"
+          >
+            Sign out
+          </button>
           <button
             onClick={() => toggleDock()}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors ${

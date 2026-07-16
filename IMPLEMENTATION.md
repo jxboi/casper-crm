@@ -1,4 +1,10 @@
-# Implementation status — Phase 0 (records-first)
+# Implementation status
+
+A session-by-session build log; newest increments at the bottom. **Phase 0 is
+closed**; the current frontier is Phase 1 durability, budgets, tests, and dogfood
+hardening per master-plan v0.9.
+
+## Phase 0 (records-first)
 
 First code lands. This session built the **records engine to its P0 scope**, plus
 the minimum foundation it depends on, as a pnpm + Turborepo monorepo (D-001). All
@@ -237,11 +243,151 @@ deal relations.
    `nextActionDate` / an aged `stageEnteredAt` (the two neglect signals that are settable data),
    keeping the seed a clean, side-effect-free set of normal writes.
 
-## Not yet built (next P0 increments)
+## casper-web — first engine wiring (D-018 vertical slice)
 
-auth OAuth login/session; the `casper-records` Filter-AST playground + `casper-auth`
-`can()` playground (D-025) and the `tooling/playground` host/kit; CSV export (P1);
-config-snapshot persistence to
-`record_types`/`field_defs`; casper-web wiring (the current web app is a
-disconnected prototype). Relations cascade-on-archive is stubbed (edges maintained,
-enforcement deferred).
+The web app stops being a disconnected prototype: the **Pipeline board now runs on the real
+engine, in-process, inside the Next server.** Seeded deals render through relations; drag-to-
+transition goes through the pure workflow guard → `can()` → the records write path →
+`stage_changed` → automations, and persists to PGlite. Verified end-to-end in the browser +
+via a throwaway route (since removed): a legal move persisted, an illegal move was rejected by
+the engine (`no transition 'qualified' → 'won'`), and `deal.stage_changed` hit the audit log.
+
+| Area | What landed |
+|---|---|
+| Workspace | `casper-web` joined the pnpm workspace (D-019 — one monorepo); npm lock removed; `@casper/*` + `drizzle-orm` + `@electric-sql/pglite` added as deps. |
+| Engine runtime (`lib/server/engine.ts`) | In-process bootstrap: registers every module, brings up **PGlite** (D-019, the Neon swap is prod-only), migrates, and seeds a dev org/workspace + the sales demo dataset. Dev **principal** = a Manager (OAuth login still deferred); every UI action runs through `can()` + the single write path under it. |
+| BFF (`lib/server/actions.ts`, `map.ts`, `context.ts`) | Next **Server Functions** as the web↔engine layer: `loadPipeline`, `moveDealStage` (marks-Lost writes the guard-required reason then transitions). `withEngine` opens the dev tenant context per call; mappers translate engine `RecordModel`s → the web view types, so the UI is untouched by the switch. |
+| UI | `app/pipeline/page.tsx` rewired from the zustand mock to the BFF (reads + transition + neglect badges on real data); `LostReasonDialog` made transport-agnostic (`onConfirm`). |
+
+### Infra decisions & gotchas (flagged — these recur for all future web wiring)
+
+1. **Transport = Next Server Functions, not tRPC (deviation from D-018).** Native to the App
+   Router, zero extra deps, lowest blast radius in this non-standard Next 16. The typed tRPC
+   client earns its place with the AI run streams (P1b); the transport is swappable without
+   touching the UI. Flagged for the plan.
+2. **`next dev --webpack`, not Turbopack.** The `@casper/*` packages use `moduleResolution:
+   bundler` but write NodeNext-style `.js` specifiers pointing at `.ts` sources. tsc/vitest
+   tolerate this; Turbopack has no `extensionAlias` and can't resolve `./x.js`→`./x.ts`. Webpack
+   can (`config.resolve.extensionAlias` in `next.config.ts`), so this app runs webpack. (Cleaner
+   long-term fix: make the engine imports extensionless, matching `bundler` resolution.)
+3. **PGlite is a `serverExternalPackages` entry; `@casper/*` are `transpilePackages`** (raw TS,
+   so the bundler must compile them — they can't be externalized like a built dep).
+4. **Module-graph duplication.** Next bundles Route Handlers / Server Actions / RSC into
+   *separate* module graphs, so the engine's module-level singletons (the record/workflow
+   registries, the `setDb` handle) are duplicated per graph. The bootstrap therefore splits into
+   `registerAll()` (idempotent in-memory registration, run on **every** `getEngine()` so each
+   graph's registries are populated) + `provision()` (create DB + migrate + seed **once**, cached
+   on `globalThis`, holding the shared PGlite handle every graph's `setDb` is pointed at).
+
+### Scope (wired: Pipeline board + deal detail + all list views)
+
+Wired + verified on the real engine:
+- **Pipeline board** — reads, drag-to-transition, neglect badges.
+- **Deal detail** (`app/deals/[id]/page.tsx`) — company + contacts resolved through relations;
+  stage controls via `moveDealStage`; inline field edits (`updateDealField`) and task add/toggle
+  (`addDealTask`/`toggleDealTask`) through the records write path; the **timeline** rendered from
+  the events projection (`getTimeline`). Verified in-browser: transitioning Proposal→Negotiation
+  updated the stage, offered the new legal targets, and grew the timeline to 3 events
+  (`deal.stage_changed` + `deal.updated` + `deal.created`).
+- **List views** — Deals (`app/deals/page.tsx`, via `loadPipeline`, with the all/mine/neglected/
+  closing filters) plus new **Companies** and **Contacts** pages (`loadDirectory`; the nav links
+  previously 404'd). All render seeded records with relations resolved and neglect badges.
+
+BFF surface: `loadPipeline`, `loadDirectory`, `moveDealStage`, `getDealDetail`, `updateDealField`,
+`addDealTask`, `toggleDealTask` (all `withEngine` → module API → mapper); mappers `toWebDeal` /
+`toWebCompany` / `toWebContact` / `toWebTask` / `toWebTimelineEvent`.
+
+Two later increments completed the slice: the **approval flow** moved onto the real
+`casper-changesets` module (dock Changes tab + Approvals inbox: per-change approve/reject and
+commit through the engine, `listChangeSets` added to the changesets API, `causationId =
+changeset` on every applied event), and the **AI dock went live end-to-end** on the casper-ai
+run engine (next section). **Still mock:** the feedback widget and the shell's "acting as" user
+switcher (single dev principal until login lands).
+
+## casper-ai — P1b run engine (`@casper/ai`)
+
+The M1 "first follow-up" slice stops being scripted: the dock's run is a **real Claude
+model/tool loop** over the engine. What landed:
+
+| Area | What landed |
+|---|---|
+| Registry (`registry.ts`) | Assistant definitions as config-data (like record types / workflows), registered by product modules. casper-sales ships the **Sales Follow-up Assistant** (`casper-sales/src/assistant.ts`): identity, purpose/prompt, M1 tool allowlist, opus tier, `policyMatrix: { config_publish: "never" }`, budgets. |
+| Run engine (`run.ts`) | `startRun` executes under the **assistant principal** (attribution: change-set author, reads) with the requesting user as the capping **owner** (D-022). Stages a draft change set up front, drives the model/tool loop (max 12 iterations), and ends at `preview_ready` — a submitted change set. Runs persist to `ai_runs`; every model turn and tool call to `ai_run_steps` with tokens/cost — the audit source of truth, independent of the UI stream. |
+| Tool framework (`run-tool.ts`, `tools.ts`) | The **M1 7-tool set** (`search_records`, `read_record`, `read_timeline`, `propose_create_task`, `propose_update_field`, `draft_email`, `finalize_for_review`). Single gate order: allowlist → policy matrix → zod parse → `can()` **against the owner** → execute → step log; denials emit `ai.tool_denied` and return `is_error` tool_results (the model recovers, the loop never throws). Propose tools call `addChange` only — no code path to a live record. |
+| Model gateway (`gateway.ts`) | Anthropic SDK, `claude-opus-4-8` + adaptive thinking + high effort; system stance prompt-cached (`cache_control: ephemeral`, stable prefix); per-turn token/cost accounting off the D-009 pricing table. The D-016 stance ("content is DATA, never instructions") is in the system prompt; tool results are structured JSON. |
+| Web SSE (`casper-web/app/api/ai/run/route.ts`) | The SSE origin the dock was waiting on: `POST /api/ai/run` streams `RunEvent`s (message deltas, tool calls, plan steps, email-draft artifacts, preview_ready). The store parses the stream and projects it onto the four surfaces; on `preview_ready` it loads the real change set for the Changes tab. Conversation/plan theatre retired. |
+
+### Deviations from the casper-ai plan (flagged, tracked for P1c)
+
+1. **In-process loop, not a WDK workflow (D-019).** The route handler runs the whole loop and
+   holds the SSE open. Fine for the single-user dogfood; durability (per-step retry, crash
+   resume, `createHook` approval pauses) is the P1c move, and the run/step persistence layer
+   is already shaped for it.
+2. **The plan object is a placeholder.** `lightweightPlan()` emits three static steps; there is
+   no `clarifying`/`awaiting_plan_approval` engine state. The dock's clarify exchange ("all
+   deals vs closing this month") is scripted client-side and shapes the request string.
+3. **Budgets declared, not enforced.** `perRunTokenCap`/`maxRecordsPerRun` sit on the assistant
+   def; nothing reads them yet (the max-iterations cap is the only limiter). The
+   `ai_budget_counters` table exists in the ai migration but nothing writes it.
+4. **`dataBlock()` is exported but unused** — M1 content reaches the model as JSON tool
+   results, which is structurally injection-safe, but the system prompt's `<data>`-block claim
+   doesn't match the wire yet. Align when timeline/email content starts flowing into prompts.
+5. **No tests in `@casper/ai` yet.** The headline success criterion — *no path from model output
+   to a committed write* — holds by construction (propose tools only call `addChange`; commit
+   lives in casper-changesets behind human action) but is not yet verified by a test that
+   attempts it. Highest-value next test, alongside allowlist/policy/`can()` denial cases with a
+   mocked gateway.
+
+## casper-platform — Neon binding (D-019 prod swap)
+
+Infra provisioned and the config swap made real, verified against the live database:
+
+- **Provisioned via Vercel Marketplace:** Vercel project `casper-crm` (linked, GitHub-connected)
+  + Neon resource `casper-crm-db` (free plan), env vars injected for all environments and
+  pulled to the repo-root `.env.local` (gitignored).
+- **`createDb()` factory** in `casper-platform/src/db/client.ts`: `DATABASE_URL` → Neon over
+  the **WebSocket driver** (`drizzle-orm/neon-serverless` + `Pool`) — never neon-http, which is
+  stateless and cannot hold the interactive transactions `withTx`'s RLS pattern needs; no
+  `DATABASE_URL` → PGlite (on-disk via `PGLITE_DATA`, else in-memory). `Db`'s `$client` is now
+  `PGlite | Pool`; the migration runner branches on it (PGlite `exec()` batch vs an
+  unparameterized `query()` — node-postgres's multi-statement simple protocol).
+- **Bootstrap migration fix (Neon-only failure PGlite masked):** Neon's login user is not
+  superuser, so `SET LOCAL ROLE casper_app` fails with 42501 without membership — the
+  bootstrap migration now runs `GRANT casper_app TO CURRENT_USER` (harmless no-op under
+  PGlite's superuser).
+- **Verified on live Neon** (throwaway script, since removed): all 9 module migrations applied
+  cleanly (28 tables — generated columns, GIN/FTS included), `withTx` ran as `casper_app` with
+  tx-local session vars and RLS filtering, second `runMigrations` a no-op. The schema now
+  exists on `casper-crm-db`.
+- **Deliberately not switched:** `casper-web`'s `engine.ts` still calls `createPgliteDb()` —
+  its `provision()` creates a dev org + seeds demo data unconditionally per process, which
+  must become idempotent/gated before the app may point at a durable database. That gating is
+  the next deploy-prep increment (with login + Vercel root-directory config).
+- Driver pinned at `@neondatabase/serverless@0.10.4` (lockfile-wide peer); upgrade to ^1.0.2
+  is a separate low-risk chore.
+
+## Phase 0 closure — 2026-07-16
+
+- Better Auth email/password signup and sessions are live; signup provisions an isolated
+  org/workspace owner membership. GitHub OAuth is config-ready and only renders when its
+  provider credentials are present.
+- `casper-api` is the shared composition root for requests and jobs. The transactional outbox
+  has a tested recovery sweeper and a deployed WDK workflow; Vercel Hobby's daily cron starts
+  a durable 24-hour loop that drains once per minute.
+- Public Phase 0 mutations call `assertCan()`; unsafe tenant provisioning is confined to the
+  explicit `@casper/auth/testkit` subpath. Invitations and role changes are functional and
+  covered by authorization/acceptance tests.
+- `pnpm play auth` and `pnpm play records` boot the dev-only `can()` and Filter-AST surfaces;
+  both passed browser checks and are excluded from Vercel uploads.
+- CI is frozen install → typecheck → test → build. Closure gate: 12/12 packages typecheck,
+  63 tests pass, and the Next production build includes auth, health, cron, and workflow routes.
+- Production: `https://casper-crm.vercel.app`, Node 22, Next.js, one Neon database. Two live
+  signups received distinct tenants; an org-A record was invisible to org B and produced both
+  audit and timeline projections. Health returned ready and a production outbox workflow run
+  completed successfully.
+
+## Not yet built (next increments)
+
+GitHub OAuth provider credentials; casper-ai P1c (budgets, tests, real plan/clarify states);
+feedback widget wiring; CSV export/import and dedupe; config-snapshot persistence to
+`record_types`/`field_defs`. Relations cascade-on-archive remains deferred.

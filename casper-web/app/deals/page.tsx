@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { neglectReasons } from "@/lib/pipeline";
 import { dateShort, money, relDays } from "@/lib/format";
-import type { Deal } from "@/lib/types";
+import type { Company, Deal, User } from "@/lib/types";
+import { loadPipeline } from "@/lib/server/actions";
 import { PageHeader } from "@/components/page-header";
+import { TableSkeletonRows } from "@/components/skeleton";
 import { NeglectBadge, StageBadge } from "@/components/stage-badge";
 
 type View = "all" | "mine" | "neglected" | "closing";
@@ -21,13 +23,25 @@ const VIEWS: { key: View; label: string }[] = [
 
 export default function DealsPage() {
   const router = useRouter();
-  const deals = useStore((s) => s.deals);
-  const companies = useStore((s) => s.companies);
-  const users = useStore((s) => s.users);
-  const currentUserId = useStore((s) => s.currentUserId);
-  const startRun = useStore((s) => s.startRun);
+  const startRun = useStore((s) => s.startRun); // opens the dock + launches a real casper-ai run
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("all");
 
+  useEffect(() => {
+    void (async () => {
+      const data = await loadPipeline();
+      setDeals(data.deals);
+      setCompanies(data.companies);
+      setUsers(data.users);
+      setLoading(false);
+    })();
+  }, []);
+
+  // Single dev principal until login lands, so "mine" resolves to that user.
+  const currentUserId = users[0]?.id;
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? "—";
   const owner = (id: string) => users.find((u) => u.id === id);
 
@@ -75,13 +89,20 @@ export default function DealsPage() {
             <thead>
               <tr className="border-b border-line bg-panel-2/50 text-left">
                 {["Deal", "Company", "Stage", "Amount", "Close", "Owner", "Last activity"].map((h) => (
-                  <th key={h} className="px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-faint">
+                  <th
+                    key={h}
+                    scope="col"
+                    className={`px-4 py-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-faint ${
+                      h === "Amount" ? "text-right" : ""
+                    }`}
+                  >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
+              {loading && <TableSkeletonRows rows={4} cols={7} />}
               {rows.map((d: Deal) => {
                 const reasons = neglectReasons(d);
                 return (
@@ -100,7 +121,7 @@ export default function DealsPage() {
                     <td className="px-4 py-2.5">
                       <StageBadge stage={d.stage} />
                     </td>
-                    <td className="px-4 py-2.5 font-mono tabular-nums">{money(d.amount, d.currency)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">{money(d.amount, d.currency)}</td>
                     <td className="px-4 py-2.5 font-mono tabular-nums text-muted">{dateShort(d.expectedCloseDate)}</td>
                     <td className="px-4 py-2.5">
                       <span className="text-muted">{owner(d.ownerId)?.name}</span>
@@ -109,7 +130,7 @@ export default function DealsPage() {
                   </tr>
                 );
               })}
-              {rows.length === 0 && (
+              {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center font-mono text-[12px] text-faint">
                     No deals match this view.

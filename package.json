@@ -10,7 +10,8 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "play": "node tooling/playground/run.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
